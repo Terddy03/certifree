@@ -1,0 +1,295 @@
+{
+  "config": {
+    "enabled": true,
+    "logLevel": "debug",
+    "showTimestamps": true,
+    "trackPerformance": true,
+    "logToConsole": true,
+    "logToStorage": true
+  },
+  "stats": {
+    "totalLogs": 17,
+    "errorCount": 4,
+    "warningCount": 0,
+    "performanceMetrics": [
+      {
+        "name": "useAuth:getActiveSession",
+        "startTime": 315535
+      }
+    ],
+    "recentLogs": [
+      {
+        "timestamp": "2025-08-07T15:20:49.274Z",
+        "level": "debug",
+        "message": "Attempting signup",
+        "data": {
+          "email": "tests2@gmail.com",
+          "passwordProvided": true
+        },
+        "component": "Auth"
+      },
+      {
+        "timestamp": "2025-08-07T15:20:50.837Z",
+        "level": "debug",
+        "message": "Attempting signup",
+        "data": {
+          "email": "tests2@gmail.com",
+          "passwordProvided": true
+        },
+        "component": "Auth"
+      },
+      {
+        "timestamp": "2025-08-07T15:20:51.848Z",
+        "level": "debug",
+        "message": "Signup successful",
+        "data": {
+          "user": "03e7a2c8-8d6b-4c60-b4e6-0567addeacc0"
+        },
+        "component": "Auth"
+      },
+      {
+        "timestamp": "2025-08-07T15:20:51.857Z",
+        "level": "error",
+        "message": "Signup failed",
+        "data": {
+          "error": "Database error saving new user",
+          "details": {
+            "__isAuthError": true,
+            "name": "AuthApiError",
+            "status": 500,
+            "code": "unexpected_failure"
+          }
+        },
+        "component": "Auth"
+      },
+      {
+        "timestamp": "2025-08-07T15:20:51.969Z",
+        "level": "debug",
+        "message": "Attempting signup",
+        "data": {
+          "email": "tests2@gmail.com",
+          "passwordProvided": true
+        },
+        "component": "Auth"
+      },
+      {
+        "timestamp": "2025-08-07T15:20:52.087Z",
+        "level": "error",
+        "message": "Signup failed",
+        "data": {
+          "error": "For security purposes, you can only request this after 57 seconds.",
+          "details": {
+            "__isAuthError": true,
+            "name": "AuthApiError",
+            "status": 429,
+            "code": "over_email_send_rate_limit"
+          }
+        },
+        "component": "Auth"
+      },
+      {
+        "timestamp": "2025-08-07T15:21:40.276Z",
+        "level": "debug",
+        "message": "Starting session fetch",
+        "component": "useAuth"
+      },
+      {
+        "timestamp": "2025-08-07T15:21:40.283Z",
+        "level": "debug",
+        "message": "No session found",
+        "component": "useAuth"
+      },
+      {
+        "timestamp": "2025-08-07T15:21:40.309Z",
+        "level": "debug",
+        "message": "Starting session fetch",
+        "component": "useAuth"
+      },
+      {
+        "timestamp": "2025-08-07T15:21:40.318Z",
+        "level": "debug",
+        "message": "No session found",
+        "component": "useAuth"
+      }
+    ]
+  },
+  "logs": [
+    {
+      "timestamp": "2025-08-07T15:16:25.235Z",
+      "level": "info",
+      "message": "Debugger initialized",
+      "data": {
+        "config": {
+          "enabled": true,
+          "logLevel": "debug",
+          "showTimestamps": true,
+          "trackPerformance": true,
+          "logToConsole": true,
+          "logToStorage": true
+        }
+      }
+    },
+    {
+      "timestamp": "2025-08-07T15:16:58.807Z",
+      "level": "debug",
+      "message": "Attempting signup",
+      "data": {
+        "email": "tests1@gmail.com",
+        "passwordProvided": true
+      },
+      "component": "Auth"
+    },
+    {
+      "timestamp": "2025-08-07T15:16:58.886Z",
+      "level": "error",
+      "message": "Signup failed",
+      "data": {
+        "error": "For security purposes, you can only request this after 46 seconds.",
+        "details": {
+          "__isAuthError": true,
+          "name": "AuthApiError",
+          "status": 429,
+          "code": "over_email_send_rate_limit"
+        }
+      },
+      "component": "Auth"
+    },
+    {
+      "timestamp": "2025-08-07T15:17:05.525Z",
+      "level": "debug",
+      "message": "Attempting signup",
+      "data": {
+        "email": "tests1@gmail.com",
+        "passwordProvided": true
+      },
+      "component": "Auth"
+    },
+    {
+      "timestamp": "2025-08-07T15:17:05.591Z",
+      "level": "error",
+      "message": "Signup failed",
+      "data": {
+        "error": "For security purposes, you can only request this after 39 seconds.",
+        "details": {
+          "__isAuthError": true,
+          "name": "AuthApiError",
+          "status": 429,
+          "code": "over_email_send_rate_limit"
+        }
+      },
+      "component": "Auth"
+    },
+    {
+      "timestamp": "2025-08-07T15:18:39.600Z",
+      "level": "debug",
+      "message": "Attempting signup",
+      "data": {
+        "email": "tests1@gmail.com",
+        "passwordProvided": true
+      },
+      "component": "Auth"
+    },
+    {
+      "timestamp": "2025-08-07T15:18:41.796Z",
+      "level": "debug",
+      "message": "Signup successful",
+      "data": {
+        "user": "d394936c-562f-42ee-9189-76987d4e9bc4"
+      },
+      "component": "Auth"
+    },
+    {
+      "timestamp": "2025-08-07T15:20:49.274Z",
+      "level": "debug",
+      "message": "Attempting signup",
+      "data": {
+        "email": "tests2@gmail.com",
+        "passwordProvided": true
+      },
+      "component": "Auth"
+    },
+    {
+      "timestamp": "2025-08-07T15:20:50.837Z",
+      "level": "debug",
+      "message": "Attempting signup",
+      "data": {
+        "email": "tests2@gmail.com",
+        "passwordProvided": true
+      },
+      "component": "Auth"
+    },
+    {
+      "timestamp": "2025-08-07T15:20:51.848Z",
+      "level": "debug",
+      "message": "Signup successful",
+      "data": {
+        "user": "03e7a2c8-8d6b-4c60-b4e6-0567addeacc0"
+      },
+      "component": "Auth"
+    },
+    {
+      "timestamp": "2025-08-07T15:20:51.857Z",
+      "level": "error",
+      "message": "Signup failed",
+      "data": {
+        "error": "Database error saving new user",
+        "details": {
+          "__isAuthError": true,
+          "name": "AuthApiError",
+          "status": 500,
+          "code": "unexpected_failure"
+        }
+      },
+      "component": "Auth"
+    },
+    {
+      "timestamp": "2025-08-07T15:20:51.969Z",
+      "level": "debug",
+      "message": "Attempting signup",
+      "data": {
+        "email": "tests2@gmail.com",
+        "passwordProvided": true
+      },
+      "component": "Auth"
+    },
+    {
+      "timestamp": "2025-08-07T15:20:52.087Z",
+      "level": "error",
+      "message": "Signup failed",
+      "data": {
+        "error": "For security purposes, you can only request this after 57 seconds.",
+        "details": {
+          "__isAuthError": true,
+          "name": "AuthApiError",
+          "status": 429,
+          "code": "over_email_send_rate_limit"
+        }
+      },
+      "component": "Auth"
+    },
+    {
+      "timestamp": "2025-08-07T15:21:40.276Z",
+      "level": "debug",
+      "message": "Starting session fetch",
+      "component": "useAuth"
+    },
+    {
+      "timestamp": "2025-08-07T15:21:40.283Z",
+      "level": "debug",
+      "message": "No session found",
+      "component": "useAuth"
+    },
+    {
+      "timestamp": "2025-08-07T15:21:40.309Z",
+      "level": "debug",
+      "message": "Starting session fetch",
+      "component": "useAuth"
+    },
+    {
+      "timestamp": "2025-08-07T15:21:40.318Z",
+      "level": "debug",
+      "message": "No session found",
+      "component": "useAuth"
+    }
+  ]
+}
