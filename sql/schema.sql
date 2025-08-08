@@ -222,3 +222,103 @@ ALTER PUBLICATION supabase_realtime ADD TABLE user_achievements;
 ALTER PUBLICATION supabase_realtime ADD TABLE quiz_questions;
 ALTER PUBLICATION supabase_realtime ADD TABLE quiz_attempts;
 ALTER PUBLICATION supabase_realtime ADD TABLE certification_reviews;
+
+-- 8. Admin role support and Categories table for content management
+-- Add is_admin flag to profiles for role-based access
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_admin boolean DEFAULT false NOT NULL;
+
+-- Categories table to manage certification categories
+CREATE TABLE IF NOT EXISTS public.categories (
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name text UNIQUE NOT NULL,
+    slug text UNIQUE NOT NULL,
+    description text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+-- RLS for categories
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Categories are viewable by everyone." ON public.categories;
+CREATE POLICY "Categories are viewable by everyone." ON public.categories
+  FOR SELECT USING (true);
+
+-- Helper condition: current user is admin
+-- Used inline in policies below via EXISTS
+
+-- Admin policies for categories
+DROP POLICY IF EXISTS "Admins can insert categories." ON public.categories;
+CREATE POLICY "Admins can insert categories." ON public.categories
+  FOR INSERT
+  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+
+DROP POLICY IF EXISTS "Admins can update categories." ON public.categories;
+CREATE POLICY "Admins can update categories." ON public.categories
+  FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+
+DROP POLICY IF EXISTS "Admins can delete categories." ON public.categories;
+CREATE POLICY "Admins can delete categories." ON public.categories
+  FOR DELETE
+  USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+
+-- Admin policies for certifications (insert/update/delete)
+DROP POLICY IF EXISTS "Admins can insert certifications." ON public.certifications;
+CREATE POLICY "Admins can insert certifications." ON public.certifications
+  FOR INSERT
+  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+
+DROP POLICY IF EXISTS "Admins can update certifications." ON public.certifications;
+CREATE POLICY "Admins can update certifications." ON public.certifications
+  FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+
+DROP POLICY IF EXISTS "Admins can delete certifications." ON public.certifications;
+CREATE POLICY "Admins can delete certifications." ON public.certifications
+  FOR DELETE
+  USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+
+-- 9. User Favorites Table
+-- Stores which certifications a user has favorited
+CREATE TABLE IF NOT EXISTS public.user_favorites (
+    user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    certification_id text REFERENCES public.certifications(id) ON DELETE CASCADE NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    PRIMARY KEY (user_id, certification_id)
+);
+
+-- RLS for user_favorites
+ALTER TABLE public.user_favorites ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view their own favorites." ON public.user_favorites;
+CREATE POLICY "Users can view their own favorites." ON public.user_favorites
+  FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can add their own favorites." ON public.user_favorites;
+CREATE POLICY "Users can add their own favorites." ON public.user_favorites
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own favorites." ON public.user_favorites;
+CREATE POLICY "Users can delete their own favorites." ON public.user_favorites
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- 10. App Logs Table
+CREATE TABLE IF NOT EXISTS public.app_logs (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  user_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  action text NOT NULL,
+  details text
+);
+
+ALTER TABLE public.app_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Logs are viewable by admins only." ON public.app_logs;
+CREATE POLICY "Logs are viewable by admins only." ON public.app_logs
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+
+DROP POLICY IF EXISTS "Admins can insert logs." ON public.app_logs;
+CREATE POLICY "Admins can insert logs." ON public.app_logs
+  FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+
+-- Realtime publication
+ALTER PUBLICATION supabase_realtime ADD TABLE user_favorites;
+ALTER PUBLICATION supabase_realtime ADD TABLE app_logs;

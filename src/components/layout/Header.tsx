@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Menu, X, User, Search, Bell, LogOut, Settings, LayoutDashboard } from "lucide-react";
+import { BookOpen, Menu, X, User, Search, Bell, LogOut, Settings, LayoutDashboard, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
@@ -29,10 +29,15 @@ export const Header = ({ className }: HeaderProps) => {
   const { toast } = useToast();
   const { user, profile } = useAuth();
 
-  const navItems = [
+  const navPrimary = [
     { label: "Certifications", href: "/certifications" },
     { label: "Dashboard", href: "/dashboard" },
-    { label: "About", href: "/#about" }, // Add About link with hash for smooth scroll
+    ...(user ? [{ label: "Favorites", href: "/favorites" } as const] : []),
+    ...(user ? [] : [{ label: "About", href: "/#about" } as const]),
+    { label: "Contact", href: "/contact" },
+  ];
+  const navSecondary = [
+    ...(user ? [] : [{ label: "About", href: "/#about" } as const]),
     { label: "Contact", href: "/contact" },
   ];
 
@@ -46,83 +51,70 @@ export const Header = ({ className }: HeaderProps) => {
 
   const handleSearchSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      console.log("Search query:", searchQuery);
-      // Implement actual search logic here
       setIsSearchOpen(false);
       setSearchQuery("");
       toast({
-        title: "Search Initiated",
-        description: `Searching for: "${searchQuery}"`, 
+        title: "Search",
+        description: `Searching for: "${searchQuery}"`,
       });
     }
   };
 
   const handleNotificationClick = () => {
-    toast({
-      title: "Notifications",
-      description: "You have no new notifications.",
-    });
-  };
-
-  const handleUserClick = () => {
-    navigate("/dashboard"); // Navigate to dashboard or user profile page
+    toast({ title: "Notifications", description: "You have no new notifications." });
   };
 
   const handleSignInClick = () => {
-    navigate("/auth"); // Navigate to the authentication page
+    navigate("/auth");
   };
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
-      toast({
-        title: "Logout Failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Logout Failed", description: error.message, variant: "destructive" });
     } else {
-      toast({
-        title: "Logged Out",
-        description: "You have been successfully logged out.",
-      });
+      toast({ title: "Logged Out", description: "You have been successfully logged out." });
       navigate("/auth");
     }
   };
 
   return (
-    <header className={cn("sticky top-0 z-50 w-full border-b border-[#001d3d] bg-[#000814]/90 backdrop-blur-lg shadow-md", className)}>
+    <header className={cn("sticky top-0 z-50 w-full border-b border-[#001d3d] bg-[#000814]/90 backdrop-blur-lg shadow-md", className)} style={{marginTop: 0}}>
       <div className="container mx-auto flex h-16 items-center justify-between px-6">
         {/* Logo */}
         <Link to="/" className="flex items-center space-x-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[#003566] shadow-lg">
-            <BookOpen className="h-6 w-6 text-[#ffc300]" />
-          </div>
+          <img src="/images/certifreelogovector.png" alt="CertiFree" className="w-10 h-10 rounded-md shadow-lg object-contain bg-transparent" />
           <div className="flex flex-col leading-none">
             <span className="text-xl font-bold text-white">Certi<span className="text-[#ffd60a]">Free</span></span>
             <span className="text-xs text-gray-400 hidden sm:block">Free IT Certifications</span>
           </div>
         </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-8">
-          {navItems.map((item) => (
+        {/* Desktop Navigation (show all) */}
+        <nav className="hidden md:flex items-center space-x-6">
+          {navPrimary.map((item) => (
             <Link
               key={item.label}
               to={item.href}
-              className="text-sm font-semibold text-gray-300 hover:text-[#ffd60a] transition-colors duration-200"
+              className="text-sm font-semibold text-gray-300 hover:text-[#ffd60a] transition-colors"
             >
               {item.label}
             </Link>
           ))}
+          {profile?.isAdmin && (
+            <Button variant="ghost" className="text-gray-300 hover:text-[#ffd60a]" onClick={() => navigate('/settings')}>
+              <Settings className="mr-2 h-4 w-4" /> Settings
+            </Button>
+          )}
         </nav>
 
         {/* Desktop Actions */}
-        <div className="hidden md:flex items-center space-x-4">
+        <div className="hidden md:flex items-center space-x-2">
           {isSearchOpen && (
             <Input
               type="text"
               placeholder="Search certifications..."
-              className="w-48 transition-all duration-300 bg-[#001d3d] border-[#003566] text-white placeholder-gray-500 focus:border-[#ffc300] focus:ring-[#ffc300]"
+              className="w-48 bg-[#001d3d] border-[#003566] text-white placeholder-gray-500 focus:border-[#ffc300] focus:ring-[#ffc300]"
               value={searchQuery}
               onChange={handleSearchChange}
               onKeyDown={handleSearchSubmit}
@@ -130,7 +122,7 @@ export const Header = ({ className }: HeaderProps) => {
               autoFocus
             />
           )}
-          <Button size="icon" variant="ghost" className="relative text-gray-300 hover:text-[#ffd60a] hover:bg-[#001d3d]" onClick={handleSearchClick}>
+          <Button size="icon" variant="ghost" className="text-gray-300 hover:text-[#ffd60a] hover:bg-[#001d3d]" onClick={handleSearchClick}>
             <Search className="h-5 w-5" />
           </Button>
           <Button size="icon" variant="ghost" className="relative text-gray-300 hover:text-[#ffd60a] hover:bg-[#001d3d]" onClick={handleNotificationClick}>
@@ -152,29 +144,24 @@ export const Header = ({ className }: HeaderProps) => {
                 <DropdownMenuLabel className="font-normal text-gray-100">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">{profile?.fullName || user.email}</p>
-                    <p className="text-xs leading-none text-gray-400">
-                      {user.email}
-                    </p>
+                    <p className="text-xs leading-none text-gray-400">{user.email}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-[#003566]" />
                 <DropdownMenuItem onClick={() => navigate("/dashboard")} className="focus:bg-[#003566] focus:text-[#ffd60a]">
-                  <LayoutDashboard className="mr-2 h-4 w-4" />
-                  Dashboard
+                  <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/settings")} className="focus:bg-[#003566] focus:text-[#ffd60a]">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
+                  <Settings className="mr-2 h-4 w-4" /> Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-[#003566]" />
                 <DropdownMenuItem onClick={handleLogout} className="focus:bg-[#003566] focus:text-[#ffd60a]">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Log out
+                  <LogOut className="mr-2 h-4 w-4" /> Log out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button className="bg-[#ffc300] text-[#001d3d] font-bold px-5 py-2 rounded-full shadow-md hover:bg-[#ffd60a] transition-colors duration-200" onClick={handleSignInClick}>Sign Up</Button>
+            <Button className="bg-[#ffc300] text-[#001d3d] font-bold px-5 py-2 rounded-full shadow-md hover:bg-[#ffd60a]" onClick={handleSignInClick}>Sign Up</Button>
           )}
         </div>
 
@@ -193,20 +180,20 @@ export const Header = ({ className }: HeaderProps) => {
 
       {/* Mobile Navigation */}
       {isMenuOpen && (
-        <div className="md:hidden border-t border-[#001d3d] bg-[#000814]/95 backdrop-blur-lg animate-slide-in-right">
+        <div className="md:hidden border-t border-[#001d3d] bg-[#000814]/95 backdrop-blur-lg">
           <div className="container mx-auto px-6 py-4 space-y-3">
-            {navItems.map((item) => (
+            {navPrimary.map((item) => (
               <Link
                 key={item.label}
                 to={item.href}
-                className="block text-base font-medium text-gray-200 hover:text-[#ffd60a] transition-colors duration-200 py-2"
+                className="block text-base font-medium text-gray-200 hover:text-[#ffd60a] py-2"
                 onClick={() => setIsMenuOpen(false)}
               >
                 {item.label}
               </Link>
             ))}
             <div className="flex flex-col space-y-3 pt-4 border-t border-[#001d3d]">
-              <Button className="bg-[#ffc300] text-[#001d3d] font-bold px-5 py-2 rounded-full shadow-md hover:bg-[#ffd60a] transition-colors duration-200 w-full" onClick={handleSignInClick}>Sign Up</Button>
+              <Button className="bg-[#ffc300] text-[#001d3d] font-bold px-5 py-2 rounded-full shadow-md hover:bg-[#ffd60a] w-full" onClick={handleSignInClick}>Sign Up</Button>
             </div>
           </div>
         </div>

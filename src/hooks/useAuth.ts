@@ -14,6 +14,7 @@ export interface UserProfile {
   learningStreak: number;
   totalCertificationsCompleted: number;
   joinedAt: string;
+  isAdmin?: boolean;
   preferences: {
     emailNotifications: boolean;
     pushNotifications: boolean;
@@ -99,6 +100,7 @@ export const useAuth = () => {
             learningStreak: profile?.learning_streak || profile?.learningStreak || 0,
             totalCertificationsCompleted: profile?.total_certifications_completed || profile?.totalCertificationsCompleted || 0,
             joinedAt: profile?.joined_at || profile?.joinedAt || new Date().toISOString(),
+            isAdmin: profile?.is_admin || false,
             preferences: {
               emailNotifications: profile?.preferences?.emailNotifications || true,
               pushNotifications: profile?.preferences?.pushNotifications || true,
