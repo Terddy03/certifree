@@ -59,6 +59,19 @@ export const useCertifications = (filters: CertificationsFilter) => {
       }
 
       try {
+        // Skip fetching if only search is active and too short
+        const onlySearch = !!filters.searchQuery && filters.searchQuery.length < 2
+          && filters.selectedCategory === 'all'
+          && filters.selectedDifficulty === 'all'
+          && filters.selectedProvider === 'all';
+        if (onlySearch) {
+          if (isMounted.current) {
+            setCertifications([]);
+            setLoading(false);
+          }
+          return;
+        }
+
         let query = supabase.from('certifications').select('*');
 
         // Apply filters

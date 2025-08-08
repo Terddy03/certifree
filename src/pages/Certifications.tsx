@@ -82,9 +82,12 @@ const Certifications = () => {
     action();
   };
 
-  // Debounce search input
+  // Debounce search input (ignore <2 chars)
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchQuery), 350);
+    const t = setTimeout(() => {
+      const q = (searchQuery || "").trim();
+      setDebouncedSearch(q.length >= 2 ? q : "");
+    }, 400);
     return () => clearTimeout(t);
   }, [searchQuery]);
 
