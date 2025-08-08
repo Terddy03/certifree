@@ -25,3 +25,20 @@ export interface Certification {
   tags: string[];
   lastUpdated: string;
 }
+
+export type DefaultCategory =
+  | "Computer Studies"
+  | "Hospitality Management"
+  | "Tourism Management"
+  | "Business"
+  | "Entrepreneurship"
+  | "Education and Liberal Arts";
+
+export const DEFAULT_CATEGORIES: { name: DefaultCategory; slug: string }[] = [
+  { name: "Computer Studies", slug: "computer-studies" },
+  { name: "Hospitality Management", slug: "hospitality-management" },
+  { name: "Tourism Management", slug: "tourism-management" },
+  { name: "Business", slug: "business" },
+  { name: "Entrepreneurship", slug: "entrepreneurship" },
+  { name: "Education and Liberal Arts", slug: "education-liberal-arts" },
+];

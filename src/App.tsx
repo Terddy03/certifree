@@ -13,6 +13,11 @@ import Auth from "./pages/Auth"; // Import the new Auth component
 import Settings from "./pages/Settings"; // Import the new Settings component
 import CertificationDetail from "./pages/CertificationDetail"; // Import the new CertificationDetail component
 import { DebugToggle } from "@/components/DebugToggle";
+import AdminLogs from "./pages/AdminLogs";
+import Favorites from "./pages/Favorites";
+import Privacy from "@/pages/Privacy";
+import Terms from "@/pages/Terms";
+import HowItWorks from "@/pages/HowItWorks";
 
 const queryClient = new QueryClient();
 
@@ -27,10 +32,15 @@ const App = () => (
           <Route path="/certifications" element={<Certifications />} />
           <Route path="/certifications/:id" element={<CertificationDetail />} /> {/* New dynamic route for certification details */}
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/favorites" element={<Favorites />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/auth" element={<Auth />} /> {/* Add the Auth route */}
           <Route path="/settings" element={<Settings />} /> {/* Add the Settings route */}
+          <Route path="/admin/logs" element={<AdminLogs />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

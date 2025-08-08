@@ -10,6 +10,9 @@ import { Star, Clock, Users, ExternalLink, BookOpen, Check } from "lucide-react"
 import { supabase } from "@/lib/supabase";
 import { Certification } from "@/lib/mock-data/certifications";
 import { componentDebug } from "@/lib/debugger";
+import { useAuth } from "@/hooks/useAuth";
+import { isTaking, startTaking, stopTaking } from "@/lib/progress";
+import { useToast } from "@/components/ui/use-toast";
 
 const CertificationDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +20,10 @@ const CertificationDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const debug = componentDebug('CertificationDetail');
+  const { profile } = useAuth();
+  const { toast } = useToast();
+  const [taking, setTaking] = useState(false);
+  const [takersCount, setTakersCount] = useState(0);
 
   useEffect(() => {
     const fetchCertification = async () => {
@@ -77,6 +84,36 @@ const CertificationDetail = () => {
     fetchCertification();
   }, [id]);
 
+  // Load taking state and count
+  useEffect(() => {
+    (async () => {
+      if (!id) return;
+      const { count } = await supabase
+        .from('user_progress')
+        .select('id', { count: 'exact', head: true })
+        .eq('certification_id', id)
+        .eq('status', 'in_progress');
+      setTakersCount(count || 0);
+      if (profile?.id) {
+        const { data } = await isTaking(profile.id, id);
+        setTaking(!!data);
+      }
+    })();
+  }, [id, profile?.id]);
+
+  const onToggleTaking = async () => {
+    if (!profile?.id) return toast({ title: 'Please sign in to track progress.' });
+    const next = !taking;
+    setTaking(next);
+    setTakersCount((c) => Math.max(0, c + (next ? 1 : -1)));
+    const { error } = next ? await startTaking(profile.id, id!) : await stopTaking(profile.id, id!);
+    if (error) {
+      setTaking(!next);
+      setTakersCount((c) => Math.max(0, c + (next ? -1 : 1)));
+      toast({ title: 'Could not update', description: error.message, variant: 'destructive' });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#000814] text-gray-300">
@@ -111,7 +148,7 @@ const CertificationDetail = () => {
       <Header />
       <main className="container mx-auto px-6 py-12 md:py-16">
         <div className="mb-8">
-          <Button variant="link" className="pl-0 text-gray-300 hover:text-[#ffd60a] transition-colors duration-200" asChild>
+          <Button variant="link" className="pl-0 text-gray-300 hover:text[#ffd60a] transition-colors duration-200" asChild>
             <Link to="/certifications">&larr; Back to Certifications</Link>
           </Button>
         </div>
@@ -122,45 +159,39 @@ const CertificationDetail = () => {
             <Card className="bg-[#001d3d] text-white rounded-xl shadow-xl border border-[#003566]">
               <CardContent className="p-8">
                 <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-6 sm:space-y-0 sm:space-x-6 mb-8">
-                  <img 
-                    src={certification.imageUrl} 
-                    alt={certification.title}
-                    className="w-32 h-20 object-cover rounded-lg flex-shrink-0 shadow-md"
-                  />
+                  {certification.imageUrl?.toLowerCase().endsWith('.pdf') ? (
+                    <a href={certification.imageUrl} target="_blank" rel="noopener noreferrer" className="w-32 h-20 flex items-center justify-center rounded-lg flex-shrink-0 shadow-md bg-[#003566] text-xs text-gray-200">View PDF</a>
+                  ) : (
+                    <img 
+                      src={certification.imageUrl} 
+                      alt={certification.title}
+                      className="w-32 h-20 object-cover rounded-lg flex-shrink-0 shadow-md"
+                    />
+                  )}
                   <div className="text-center sm:text-left">
                     <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2 leading-tight">{certification.title}</h1>
                     <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-2 text-sm text-gray-400">
-                      <Badge className="bg-[#003566] text-gray-200 text-xs font-semibold px-3 py-1 rounded-full">
+                      <Badge className="bg[#003566] text-gray-200 text-xs font-semibold px-3 py-1 rounded-full">
                         {certification.provider}
                       </Badge>
-                      <Badge 
-                        variant="outline" 
-                        className={`text-xs font-semibold px-3 py-1 rounded-full border ${
-                          certification.difficulty === "Beginner" ? "text-green-400 border-green-700 bg-green-900/20" :
-                          certification.difficulty === "Intermediate" ? "text-yellow-400 border-yellow-700 bg-yellow-900/20" :
-                          "text-red-400 border-red-700 bg-red-900/20"
-                        }`}
-                      >
-                        {certification.difficulty}
-                      </Badge>
-                      <span>{certification.duration}</span>
                     </div>
                   </div>
                 </div>
                 
-                <p className="text-base text-gray-300 mb-6 leading-relaxed">{certification.description}</p>
+                <p className="text-base text-gray-300 mb-4 leading-relaxed">{certification.description}</p>
+                <div className="flex items-center gap-3 mb-6">
+                  <Button variant="outline" onClick={onToggleTaking} className={`${taking ? 'border-green-600 text-green-400' : 'border-[#003566] text-gray-300'} bg-[#001d3d] hover:bg-[#003566]`}>
+                    {taking ? "I'm taking this" : "I am taking this cert"}
+                  </Button>
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <Users className="h-5 w-5 text-gray-500" />
+                    <span>{takersCount.toLocaleString()}</span>
+                  </div>
+                </div>
                 
                 <Separator className="my-8 bg-[#003566]" />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-base text-gray-300">
-                  <div className="flex items-center gap-3">
-                    <Star className="h-5 w-5 fill-[#ffc300] text-[#ffc300]" />
-                    <span>Rating: <span className="font-semibold">{certification.rating || 0}</span> (<span className="text-gray-500">{certification.totalReviews || 0} reviews</span>)</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Users className="h-5 w-5 text-gray-500" />
-                    <span>Completions: <span className="font-semibold">{(certification.completionCount || 0).toLocaleString()}</span></span>
-                  </div>
                   <div className="flex items-center gap-3">
                     <Clock className="h-5 w-5 text-gray-500" />
                     <span>Estimated Time: <span className="font-semibold">{certification.duration}</span></span>
@@ -193,13 +224,24 @@ const CertificationDetail = () => {
                     </ul>
                   </>
                 )}
-
-                <Button asChild className="w-full bg-[#ffc300] text-[#001d3d] font-bold py-3 px-6 rounded-full shadow-md hover:bg-[#ffd60a] transition-colors duration-200 text-lg mt-6">
-                  <a href={certification.externalUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center">
-                    Start Certification on {certification.provider}
-                    <ExternalLink className="ml-3 h-5 w-5" />
-                  </a>
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                  <Button asChild className="flex-1 bg-[#ffc300] text-[#001d3d] font-bold py-3 px-6 rounded-full shadow-md hover:bg-[#ffd60a] transition-colors duration-200 text-lg">
+                    <a href={certification.externalUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center">
+                      Start Certification on {certification.provider}
+                      <ExternalLink className="ml-3 h-5 w-5" />
+                    </a>
+                  </Button>
+                  <Button variant="outline" onClick={onToggleTaking} className={`${taking ? 'border-green-600 text-green-400' : 'border-[#003566] text-gray-300'} bg-[#001d3d] hover:bg-[#003566]`}> 
+                    {taking ? "I'm taking this" : "I am taking this cert"}
+                  </Button>
+                  <Button variant="outline" className="border-[#003566] text-gray-300 bg-[#001d3d] hover:bg-[#003566]" onClick={async () => {
+                    if (!profile?.id) return toast({ title: 'Please sign in to mark completed.' });
+                    // Mark as completed by upserting a completed row
+                    const { error } = await supabase.from('user_progress').upsert({ user_id: profile.id, certification_id: certification.id, status: 'completed', completed_at: new Date().toISOString() }, { onConflict: 'user_id,certification_id' });
+                    if (error) toast({ title: 'Could not mark completed', description: error.message, variant: 'destructive' });
+                    else toast({ title: 'Marked as completed' });
+                  }}>Mark Completed</Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -223,19 +265,6 @@ const CertificationDetail = () => {
               </CardHeader>
               <CardContent className="p-8 pt-0">
                 <p className="text-gray-400">Coming soon: Dynamically suggested related certifications.</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-[#001d3d] text-white rounded-xl shadow-xl border border-[#003566]">
-              <CardHeader className="p-8 pb-4">
-                <CardTitle className="text-2xl font-bold text-white">Career Impact</CardTitle>
-              </CardHeader>
-              <CardContent className="p-8 pt-0 text-gray-400">
-                <p className="mb-3 leading-relaxed">Based on our data, completing this certification can significantly boost your career opportunities.</p>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-400" />
-                  <span className="text-base">Career Impact Score: <span className="font-semibold">{certification.careerImpact}/10</span></span>
-                </div>
               </CardContent>
             </Card>
           </div>

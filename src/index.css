@@ -132,16 +132,23 @@
   
   html {
     font-family: 'Inter', system-ui, sans-serif;
+    height: 100%;
+    scroll-behavior: smooth;
   }
 
   body {
     @apply bg-background text-foreground font-normal;
     font-feature-settings: 'rlig' 1, 'calt' 1;
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
   }
-  
-  /* Smooth scrolling */
-  html {
-    scroll-behavior: smooth;
+
+  /* Ensure React root fills viewport and has no spacing */
+  #root {
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
   }
   
   /* Custom scrollbar */
