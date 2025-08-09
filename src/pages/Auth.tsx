@@ -86,6 +86,22 @@ const Auth = () => {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + '/dashboard',
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
+    if (error) {
+      toast({ title: 'Google Sign-In Failed', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const handleSignUp = async (values: z.infer<typeof signupSchema>) => {
     debug.log('Attempting signup', { email: values.email, passwordProvided: !!values.password });
     const { data, error } = await supabase.auth.signUp({
@@ -206,6 +222,14 @@ const Auth = () => {
                     <TabsTrigger value="signup">Sign Up</TabsTrigger>
                   </TabsList>
                   <TabsContent value="login" className="mt-0">
+                    <Button onClick={handleGoogleLogin} className="w-full bg-[#fff] text-[#001d3d] hover:bg-gray-100">
+                      Continue with Google
+                    </Button>
+                    <div className="flex items-center gap-3 text-gray-400">
+                      <div className="flex-1 h-px bg-[#003566]" />
+                      <span className="text-xs">or</span>
+                      <div className="flex-1 h-px bg-[#003566]" />
+                    </div>
                     <Form {...loginForm}>
                       <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-6">
                         <div className="grid gap-3">

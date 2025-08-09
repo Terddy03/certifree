@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
 import { UserProgress, UserAchievement } from '@/lib/mock-data/users';
@@ -15,6 +15,7 @@ export interface UserProfile {
   totalCertificationsCompleted: number;
   joinedAt: string;
   isAdmin?: boolean;
+  isSuperAdmin?: boolean;
   preferences: {
     emailNotifications: boolean;
     pushNotifications: boolean;
@@ -47,6 +48,58 @@ export const useAuth = () => {
     loading: true,
     error: null,
   });
+
+  const profileChannelRef = useRef<any | null>(null);
+
+  const subscribeToProfileUpdates = (userId: string) => {
+    try {
+      if (profileChannelRef.current) {
+        supabase.removeChannel(profileChannelRef.current);
+        profileChannelRef.current = null;
+      }
+      const channel = supabase
+        .channel(`profiles-changes-${userId}`)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` }, (payload) => {
+          const updated: any = payload.new;
+          setAuthState((prev) => {
+            if (!prev.user) return prev;
+            const mergedProfile: UserProfile = {
+              id: updated?.id || prev.profile?.id || userId,
+              email: updated?.email || prev.profile?.email || '',
+              fullName: updated?.full_name || updated?.fullName || prev.profile?.fullName || 'User',
+              avatarUrl: updated?.avatar_url || updated?.avatarUrl || prev.profile?.avatarUrl || '',
+              bio: updated?.bio ?? prev.profile?.bio ?? '',
+              subscriptionTier: updated?.subscription_tier || updated?.subscriptionTier || prev.profile?.subscriptionTier || 'free',
+              learningStreak: updated?.learning_streak || updated?.learningStreak || prev.profile?.learningStreak || 0,
+              totalCertificationsCompleted: updated?.total_certifications_completed || updated?.totalCertificationsCompleted || prev.profile?.totalCertificationsCompleted || 0,
+              joinedAt: updated?.joined_at || prev.profile?.joinedAt || new Date().toISOString(),
+              isAdmin: (updated?.is_admin ?? prev.profile?.isAdmin ?? false) as boolean,
+              isSuperAdmin: (updated?.is_super_admin ?? prev.profile?.isSuperAdmin ?? false) as boolean,
+              preferences: {
+                emailNotifications: updated?.preferences?.emailNotifications ?? prev.profile?.preferences.emailNotifications ?? true,
+                pushNotifications: updated?.preferences?.pushNotifications ?? prev.profile?.preferences.pushNotifications ?? true,
+                newsletter: updated?.preferences?.newsletter ?? prev.profile?.preferences.newsletter ?? false,
+                learningReminders: updated?.preferences?.learningReminders ?? prev.profile?.preferences.learningReminders ?? true,
+              },
+              stats: {
+                hoursLearned: updated?.stats?.hoursLearned || updated?.stats?.hours_learned || prev.profile?.stats.hoursLearned || 0,
+                averageScore: updated?.stats?.averageScore || updated?.stats?.average_score || prev.profile?.stats.averageScore || 0,
+                skillsLearned: updated?.stats?.skillsLearned || updated?.stats?.skills_learned || prev.profile?.stats.skillsLearned || [],
+                currentGoal: updated?.stats?.currentGoal || updated?.stats?.current_goal || prev.profile?.stats.currentGoal || 'Complete your first certification',
+              },
+              userProgress: prev.profile?.userProgress || [],
+              userAchievements: prev.profile?.userAchievements || [],
+            };
+            debug.log('Profile updated via realtime', { isAdmin: mergedProfile.isAdmin, isSuperAdmin: mergedProfile.isSuperAdmin });
+            return { ...prev, profile: mergedProfile };
+          });
+        })
+        .subscribe();
+      profileChannelRef.current = channel;
+    } catch (err: any) {
+      debug.error('Failed to subscribe to profile updates', { error: err.message });
+    }
+  };
 
   useEffect(() => {
     const getActiveSession = async () => {
@@ -101,6 +154,7 @@ export const useAuth = () => {
             totalCertificationsCompleted: profile?.total_certifications_completed || profile?.totalCertificationsCompleted || 0,
             joinedAt: profile?.joined_at || profile?.joinedAt || new Date().toISOString(),
             isAdmin: profile?.is_admin || false,
+            isSuperAdmin: profile?.is_super_admin || false,
             preferences: {
               emailNotifications: profile?.preferences?.emailNotifications || true,
               pushNotifications: profile?.preferences?.pushNotifications || true,
@@ -124,11 +178,18 @@ export const useAuth = () => {
             profile: transformedProfile,
             loading: false,
           }));
+
+          // Subscribe to realtime profile updates for this user
+          subscribeToProfileUpdates(session.user.id);
           
           endTimer('useAuth:getActiveSession');
         } else {
           debug.log('No session found');
           setAuthState(prev => ({ ...prev, user: null, profile: null, loading: false }));
+          if (profileChannelRef.current) {
+            supabase.removeChannel(profileChannelRef.current);
+            profileChannelRef.current = null;
+          }
         }
       } catch (error: any) {
         debug.error("Error fetching session or profile", { error: error.message });
@@ -143,12 +204,22 @@ export const useAuth = () => {
       if (session?.user) {
         // Re-fetch profile if auth state changes to logged in
         getActiveSession();
+        subscribeToProfileUpdates(session.user.id);
+      } else {
+        if (profileChannelRef.current) {
+          supabase.removeChannel(profileChannelRef.current);
+          profileChannelRef.current = null;
+        }
       }
     });
 
     return () => {
       if (authListener && authListener.subscription) {
         authListener.subscription.unsubscribe();
+      }
+      if (profileChannelRef.current) {
+        supabase.removeChannel(profileChannelRef.current);
+        profileChannelRef.current = null;
       }
     };
   }, []);

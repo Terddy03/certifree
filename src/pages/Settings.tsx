@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 const Settings = () => {
   const { user, profile } = useAuth();
   const isAdmin = !!profile?.isAdmin;
+  const isSuperAdmin = !!profile?.isSuperAdmin;
   const { toast } = useToast();
 
   const [categories, setCategories] = useState<{ id: string; name: string; slug: string }[]>([]);
@@ -57,23 +58,28 @@ const Settings = () => {
   const [loadingUsers, setLoadingUsers] = useState(false);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isSuperAdmin) return;
     (async () => {
       setLoadingUsers(true);
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, full_name, is_admin, department:preferences->>department, year_level:preferences->>yearLevel, joined_at")
+        .select("id, email, full_name, is_admin, joined_at")
         .order("joined_at", { ascending: false });
       if (!error) setUsers(data || []);
       setLoadingUsers(false);
     })();
-  }, [isAdmin]);
+  }, [isSuperAdmin]);
 
   const toggleAdmin = async (id: string, next: boolean) => {
     const prev = users;
     setUsers((u) => u.map((x) => (x.id === id ? { ...x, is_admin: next } : x)));
     const { error } = await supabase.from("profiles").update({ is_admin: next }).eq("id", id);
-    if (error) setUsers(prev);
+    if (error) {
+      setUsers(prev);
+      toast({ title: "Role update failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Role updated", description: next ? "User granted admin access" : "User revoked admin access" });
+    }
   };
 
   const filteredUsers = users.filter((u) => {
@@ -94,7 +100,7 @@ const Settings = () => {
           <TabsList className="bg-[#001d3d] border border-[#003566]">
             <TabsTrigger value="categories">Categories</TabsTrigger>
             <TabsTrigger value="certs">Certifications</TabsTrigger>
-            {isAdmin && <TabsTrigger value="users">User Management</TabsTrigger>}
+            {isSuperAdmin && <TabsTrigger value="users">User Management</TabsTrigger>}
           </TabsList>
 
           {/* Categories Management */}
@@ -264,7 +270,7 @@ const Settings = () => {
             </Card>
           </TabsContent>
 
-          {isAdmin && (
+          {isSuperAdmin && (
             <TabsContent value="users">
               <div className="bg-[#001d3d] border border-[#003566] rounded-xl p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -278,8 +284,6 @@ const Settings = () => {
                         <th className="text-left py-2 px-3">Name</th>
                         <th className="text-left py-2 px-3">Email</th>
                         <th className="text-left py-2 px-3">Role</th>
-                        <th className="text-left py-2 px-3">Department</th>
-                        <th className="text-left py-2 px-3">Year Level</th>
                         <th className="text-left py-2 px-3">Created</th>
                         <th className="text-left py-2 px-3">Actions</th>
                       </tr>
@@ -295,8 +299,6 @@ const Settings = () => {
                             <td className="py-2 px-3">
                               <span className={`text-xs px-2 py-1 rounded ${u.is_admin ? 'bg-red-900/40 text-red-300' : 'bg-[#003566] text-gray-200'}`}>{u.is_admin ? 'ADMIN' : 'STUDENT'}</span>
                             </td>
-                            <td className="py-2 px-3 text-gray-300">{u.department || '—'}</td>
-                            <td className="py-2 px-3 text-gray-300">{u.year_level || '—'}</td>
                             <td className="py-2 px-3 text-gray-300">{new Date(u.joined_at).toLocaleDateString()}</td>
                             <td className="py-2 px-3 flex items-center gap-3">
                               <div className="flex items-center gap-2">
