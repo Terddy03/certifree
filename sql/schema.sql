@@ -14,7 +14,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     total_certifications_completed integer DEFAULT 0 NOT NULL,
     joined_at timestamp with time zone DEFAULT now() NOT NULL,
     preferences jsonb DEFAULT '{}'::jsonb NOT NULL,
-    stats jsonb DEFAULT '{}'::jsonb NOT NULL
+    stats jsonb DEFAULT '{}'::jsonb NOT NULL,
+    is_admin boolean DEFAULT false NOT NULL,
+    is_super_admin boolean DEFAULT false NOT NULL
 );
 
 -- Row Level Security (RLS) for profiles table
@@ -22,8 +24,11 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- Corrected RLS Policy creation: Drop if exists, then create
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON public.profiles;
-CREATE POLICY "Public profiles are viewable by everyone." ON public.profiles
-  FOR SELECT USING (true);
+-- Restrict profile visibility: user can see self; super admin can see all
+CREATE POLICY "Profiles: self or super admin can view." ON public.profiles
+  FOR SELECT USING (
+    auth.uid() = id OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_super_admin = true)
+  );
 
 DROP POLICY IF EXISTS "Users can insert their own profile." ON public.profiles;
 CREATE POLICY "Users can insert their own profile." ON public.profiles
@@ -32,6 +37,13 @@ CREATE POLICY "Users can insert their own profile." ON public.profiles
 DROP POLICY IF EXISTS "Users can update their own profile." ON public.profiles;
 CREATE POLICY "Users can update their own profile." ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
+
+-- Super admins can update any profile (including role flags)
+DROP POLICY IF EXISTS "Admins can update any profile." ON public.profiles;
+CREATE POLICY "Super admins can update any profile." ON public.profiles
+  FOR UPDATE USING (
+    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_super_admin = true)
+  );
 
 -- Function to handle new user sign-ups (create a profile entry)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -224,8 +236,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE quiz_attempts;
 ALTER PUBLICATION supabase_realtime ADD TABLE certification_reviews;
 
 -- 8. Admin role support and Categories table for content management
--- Add is_admin flag to profiles for role-based access
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_admin boolean DEFAULT false NOT NULL;
+-- Admin and Super Admin flags already defined in profiles above
 
 -- Categories table to manage certification categories
 CREATE TABLE IF NOT EXISTS public.categories (
@@ -242,40 +253,37 @@ DROP POLICY IF EXISTS "Categories are viewable by everyone." ON public.categorie
 CREATE POLICY "Categories are viewable by everyone." ON public.categories
   FOR SELECT USING (true);
 
--- Helper condition: current user is admin
--- Used inline in policies below via EXISTS
-
--- Admin policies for categories
+-- Admin or Super Admin policies for categories
 DROP POLICY IF EXISTS "Admins can insert categories." ON public.categories;
-CREATE POLICY "Admins can insert categories." ON public.categories
+CREATE POLICY "Admins or Super Admins can insert categories." ON public.categories
   FOR INSERT
-  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true)));
 
 DROP POLICY IF EXISTS "Admins can update categories." ON public.categories;
-CREATE POLICY "Admins can update categories." ON public.categories
+CREATE POLICY "Admins or Super Admins can update categories." ON public.categories
   FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+  USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true)));
 
 DROP POLICY IF EXISTS "Admins can delete categories." ON public.categories;
-CREATE POLICY "Admins can delete categories." ON public.categories
+CREATE POLICY "Admins or Super Admins can delete categories." ON public.categories
   FOR DELETE
-  USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+  USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true)));
 
 -- Admin policies for certifications (insert/update/delete)
 DROP POLICY IF EXISTS "Admins can insert certifications." ON public.certifications;
-CREATE POLICY "Admins can insert certifications." ON public.certifications
+CREATE POLICY "Admins or Super Admins can insert certifications." ON public.certifications
   FOR INSERT
-  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true)));
 
 DROP POLICY IF EXISTS "Admins can update certifications." ON public.certifications;
-CREATE POLICY "Admins can update certifications." ON public.certifications
+CREATE POLICY "Admins or Super Admins can update certifications." ON public.certifications
   FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+  USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true)));
 
 DROP POLICY IF EXISTS "Admins can delete certifications." ON public.certifications;
-CREATE POLICY "Admins can delete certifications." ON public.certifications
+CREATE POLICY "Admins or Super Admins can delete certifications." ON public.certifications
   FOR DELETE
-  USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+  USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true)));
 
 -- 9. User Favorites Table
 -- Stores which certifications a user has favorited
@@ -313,11 +321,11 @@ CREATE TABLE IF NOT EXISTS public.app_logs (
 ALTER TABLE public.app_logs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Logs are viewable by admins only." ON public.app_logs;
 CREATE POLICY "Logs are viewable by admins only." ON public.app_logs
-  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true)));
 
 DROP POLICY IF EXISTS "Admins can insert logs." ON public.app_logs;
 CREATE POLICY "Admins can insert logs." ON public.app_logs
-  FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.is_admin = true));
+  FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true)));
 
 -- Realtime publication
 ALTER PUBLICATION supabase_realtime ADD TABLE user_favorites;
