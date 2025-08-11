@@ -3,12 +3,12 @@ import { Globe, Lightbulb, GraduationCap } from "lucide-react";
 
 export const AboutSection = () => {
   return (
-    <section id="about" className="bg-[#001d3d] text-white py-16 md:py-24 lg:py-32">
+    <section id="about" className="scroll-mt-20 bg-[#001d3d] text-white py-12 md:py-16 lg:py-20">
       <div className="container mx-auto px-6 text-center">
         <h2 className="text-4xl md:text-5xl font-extrabold text-white mb-6 leading-tight">
           Our Mission: Empowering Futures, <br className="hidden sm:block" /> One Certification at a Time.
         </h2>
-        <p className="text-lg md:text-xl text-gray-300 max-w-3xl mx-auto mb-16 leading-relaxed">
+        <p className="text-lg md:text-xl text-gray-300 max-w-3xl mx-auto mb-12 leading-relaxed">
           At CertiFree, we believe that access to quality education and career advancement opportunities should be universal. We are dedicated to breaking down financial barriers, providing a curated platform for free, recognized IT and business certifications.
         </p>
 

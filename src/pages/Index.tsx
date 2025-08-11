@@ -1,15 +1,16 @@
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Hero } from "@/components/home/Hero";
-import { Features } from "@/components/home/Features";
 import { AboutSection } from "@/components/home/AboutSection";
+import { ContactSection } from "@/components/home/ContactSection";
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
 const Index = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (!loading && user) {
@@ -17,15 +18,18 @@ const Index = () => {
     }
   }, [user, loading, navigate]);
 
+  // Scroll to target section whenever the hash changes or on initial load
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash) {
-      const element = document.getElementById(hash.substring(1));
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
-      }
+    const hash = location.hash;
+    if (!hash) return;
+    const id = hash.substring(1);
+    const element = document.getElementById(id);
+    if (element) {
+      requestAnimationFrame(() => {
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     }
-  }, []);
+  }, [location.hash]);
 
   if (loading) {
     return (
@@ -38,10 +42,10 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main>
+      <main className="m-0 p-0">
         <Hero />
-        <Features />
         <AboutSection />
+        <ContactSection />
       </main>
       <Footer />
     </div>

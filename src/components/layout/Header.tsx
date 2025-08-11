@@ -33,12 +33,12 @@ export const Header = ({ className }: HeaderProps) => {
     { label: "Certifications", href: "/certifications" },
     ...(user ? [{ label: "Dashboard", href: "/dashboard" } as const] : []),
     ...(user ? [{ label: "Favorites", href: "/favorites" } as const] : []),
-    ...(user ? [] : [{ label: "About", href: "/#about" } as const]),
-    { label: "Contact", href: "/contact" },
+    { label: "About", href: "/#about" } as const,
+    { label: "Contact", href: "/#contact" } as const,
   ];
   const navSecondary = [
-    ...(user ? [] : [{ label: "About", href: "/#about" } as const]),
-    { label: "Contact", href: "/contact" },
+    { label: "About", href: "/#about" } as const,
+    { label: "Contact", href: "/#contact" } as const,
   ];
 
   const handleSearchClick = () => {
@@ -78,6 +78,8 @@ export const Header = ({ className }: HeaderProps) => {
     }
   };
 
+  const canSeeSettings = !!(profile?.isAdmin || profile?.isSuperAdmin);
+
   return (
     <header className={cn("sticky top-0 z-50 w-full border-b border-[#001d3d] bg-[#000814]/90 backdrop-blur-lg shadow-md", className)} style={{marginTop: 0}}>
       <div className="container mx-auto flex h-16 items-center justify-between px-6">
@@ -101,7 +103,7 @@ export const Header = ({ className }: HeaderProps) => {
               {item.label}
             </Link>
           ))}
-          {profile?.isAdmin && (
+          {canSeeSettings && (
             <Button variant="ghost" className="text-gray-300 hover:text-[#ffd60a]" onClick={() => navigate('/settings')}>
               <Settings className="mr-2 h-4 w-4" /> Settings
             </Button>
@@ -156,9 +158,11 @@ export const Header = ({ className }: HeaderProps) => {
                   <DropdownMenuItem onClick={() => navigate("/dashboard")} className="focus:bg-[#003566] focus:text-[#ffd60a]">
                     <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/settings")} className="focus:bg-[#003566] focus:text-[#ffd60a]">
-                    <Settings className="mr-2 h-4 w-4" /> Settings
-                  </DropdownMenuItem>
+                  {canSeeSettings && (
+                    <DropdownMenuItem onClick={() => navigate("/settings")} className="focus:bg-[#003566] focus:text-[#ffd60a]">
+                      <Settings className="mr-2 h-4 w-4" /> Settings
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator className="bg-[#003566]" />
                   <DropdownMenuItem onClick={handleLogout} className="focus:bg-[#003566] focus:text-[#ffd60a]">
                     <LogOut className="mr-2 h-4 w-4" /> Log out
@@ -198,6 +202,11 @@ export const Header = ({ className }: HeaderProps) => {
                 {item.label}
               </Link>
             ))}
+            {canSeeSettings && (
+              <Button className="text-gray-300 hover:text-[#ffd60a] w-full" variant="ghost" onClick={() => { setIsMenuOpen(false); navigate('/settings'); }}>
+                <Settings className="mr-2 h-4 w-4" /> Settings
+              </Button>
+            )}
             <div className="flex flex-col space-y-3 pt-4 border-t border-[#001d3d]">
               <Button className="bg-[#ffc300] text-[#001d3d] font-bold px-5 py-2 rounded-full shadow-md hover:bg-[#ffd60a] w-full" onClick={handleSignInClick}>Sign In</Button>
             </div>

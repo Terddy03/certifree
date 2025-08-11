@@ -245,16 +245,7 @@ const CertificationDetail = () => {
               </CardContent>
             </Card>
 
-            {/* Reviews Section (placeholder for now) */}
-            <Card className="bg-[#001d3d] text-white rounded-xl shadow-xl border border-[#003566]">
-              <CardHeader className="p-8 pb-4">
-                <CardTitle className="text-2xl font-bold text-white">User Reviews</CardTitle>
-              </CardHeader>
-              <CardContent className="p-8 pt-0">
-                <p className="text-gray-400">No reviews yet. Be the first to review this certification!</p>
-                {/* Future: Display actual reviews from the database here */}
-              </CardContent>
-            </Card>
+            {/* Reviews removed by request */}
           </div>
 
           {/* Sidebar / Related Info (placeholder for now) */}

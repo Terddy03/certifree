@@ -439,9 +439,9 @@ const Certifications = () => {
                   {certification.title}
                 </button>
               </CardTitle>
-              <div className="flex items-start gap-3 text-xs text-gray-300">
-                <div className="w-16 h-6 rounded bg-[#003566] flex items-center justify-center text-[10px] text-gray-200 flex-shrink-0">{certification.provider}</div>
-                <p className="text-gray-400 line-clamp-2">{certification.description}</p>
+              <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-gray-300">
+                <div className="h-6 px-2 rounded bg-[#003566] flex items-center justify-center text-[10px] text-gray-200 flex-none">{certification.provider}</div>
+                <p className="text-gray-400 line-clamp-2 min-w-0 flex-1">{certification.description}</p>
               </div>
             </div>
           </div>
@@ -509,9 +509,9 @@ const Certifications = () => {
                     {certification.title}
                   </button>
                 </h3>
-                <div className="flex items-start gap-3 text-xs text-gray-300">
-                  <div className="w-20 h-6 rounded bg-[#003566] flex items-center justify-center text-[10px] text-gray-200 flex-shrink-0">{certification.provider}</div>
-                  <p className="text-gray-400 line-clamp-2">{certification.description}</p>
+                <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-gray-300">
+                  <div className="h-6 px-2 rounded bg-[#003566] flex items-center justify-center text-[10px] text-gray-200 flex-none">{certification.provider}</div>
+                  <p className="text-gray-400 line-clamp-2 min-w-0 flex-1">{certification.description}</p>
                 </div>
               </div>
 

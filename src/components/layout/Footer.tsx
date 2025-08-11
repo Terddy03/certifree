@@ -29,10 +29,10 @@ export const Footer = () => {
   ];
 
   return (
-    <footer className="bg-[#000814] text-gray-300 border-t border-[#001d3d] py-16 md:py-20">
+    <footer className="bg-[#000814] text-gray-300 border-t border-[#001d3d] py-12 md:py-16">
       <div className="container mx-auto px-6">
         {/* Brand */}
-        <div className="flex items-center space-x-4 mb-12">
+        <div className="flex items-center space-x-4 mb-10">
           <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-[#003566] shadow-lg">
             <BookOpen className="h-7 w-7 text-[#ffc300]" />
           </div>
@@ -43,7 +43,7 @@ export const Footer = () => {
         </div>
 
         {/* Links Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-8 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-8 mb-8">
           {footerSections.map((section) => (
             <div key={section.title} className="space-y-5">
               <h4 className="font-bold text-white text-lg">{section.title}</h4>
@@ -66,7 +66,7 @@ export const Footer = () => {
         </div>
 
         {/* Bottom Section */}
-        <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-[#001d3d]">
+        <div className="flex flex-col md:flex-row justify-between items-center pt-6 border-t border-[#001d3d]">
           <div className="text-sm text-gray-500 mb-4 md:mb-0">
             © 2024 CertiFree. All rights reserved.
           </div>
