@@ -257,6 +257,7 @@ const Certifications = () => {
 
   useEffect(() => {
     setCerts(filteredCertifications);
+    debug.log('Filtered certifications received', { count: filteredCertifications.length, certifications: filteredCertifications });
     // Preload favorite states for visible certs
     (async () => {
       const entries = await Promise.all(filteredCertifications.map(async (c) => {

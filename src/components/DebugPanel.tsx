@@ -124,8 +124,8 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ isOpen, onClose }) => {
           </Button>
         </CardHeader>
 
-        <CardContent className="flex-1 p-0">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
+        <CardContent className="flex-1 flex flex-col p-0">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="logs" className="flex items-center gap-1">
                 <Activity className="h-3 w-3" />
@@ -145,8 +145,8 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ isOpen, onClose }) => {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="logs" className="h-full mt-4">
-              <div className="flex justify-between items-center mb-4">
+            <TabsContent value="logs" className="h-full mt-4 flex flex-col">
+              <div className="flex justify-between items-center mb-4 flex-shrink-0 px-6">
                 <h3 className="text-sm font-medium">Recent Logs</h3>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={handleClearLogs}>
@@ -160,8 +160,8 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ isOpen, onClose }) => {
                 </div>
               </div>
               
-              <ScrollArea className="h-[calc(100%-3rem)]">
-                <div className="space-y-2">
+              <ScrollArea className="flex-1 max-h-full px-6">
+                <div className="space-y-2 pb-4">
                   {logs.slice(-50).reverse().map((log, index) => (
                     <div key={index} className="p-3 border rounded-lg text-xs">
                       <div className="flex items-center gap-2 mb-1">
@@ -190,7 +190,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ isOpen, onClose }) => {
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="performance" className="h-full mt-4">
+            <TabsContent value="performance" className="h-full mt-4 p-6 overflow-auto">
               <div className="space-y-4">
                 <h3 className="text-sm font-medium">Performance Metrics</h3>
                 {stats?.performanceMetrics?.length > 0 ? (
@@ -219,7 +219,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ isOpen, onClose }) => {
               </div>
             </TabsContent>
 
-            <TabsContent value="stats" className="h-full mt-4">
+            <TabsContent value="stats" className="h-full mt-4 p-6 overflow-auto">
               <div className="space-y-4">
                 <h3 className="text-sm font-medium">Debug Statistics</h3>
                 {stats && (
@@ -276,7 +276,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ isOpen, onClose }) => {
               </div>
             </TabsContent>
 
-            <TabsContent value="actions" className="h-full mt-4">
+            <TabsContent value="actions" className="h-full mt-4 p-6 overflow-auto">
               <div className="space-y-4">
                 <h3 className="text-sm font-medium">Debug Actions</h3>
                 

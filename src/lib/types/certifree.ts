@@ -22,6 +22,8 @@ export interface Certification {
   career_impact: number; // Added
   completion_count?: number; // Added
   modules?: CertiFreeModule[]; // New: Array of modules associated with the course
+  type?: "public" | "certifree"; // Added to distinguish between public and CertiFree offerings
+  course_id?: string | null; // Added for CertiFree type certifications
 }
 
 export interface CertiFreeModule {

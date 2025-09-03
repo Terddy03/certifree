@@ -69,7 +69,12 @@ export const Header = ({ className }: HeaderProps) => {
   };
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
+    if (!user) {
+      toast({ title: "Logout Failed", description: "No active session to log out from.", variant: "destructive" });
+      navigate("/auth");
+      return;
+    }
+    const { error } = await supabase.auth.signOut({ options: { redirectTo: '/' } });
     if (error) {
       toast({ title: "Logout Failed", description: error.message, variant: "destructive" });
     } else {

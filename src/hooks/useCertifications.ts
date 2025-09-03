@@ -35,6 +35,8 @@ const transformCertification = (dbCertification: any): Certification => ({
   created_at: dbCertification.created_at, // Use created_at directly
   updated_at: dbCertification.updated_at || new Date().toISOString(), // Use updated_at directly
   modules: dbCertification.modules,
+  type: dbCertification.certification_type === 'CertiFree' ? 'certifree' : 'public', // Derive type from certification_type
+  course_id: dbCertification.course_id || null, // Add course_id
 });
 
 export const useCertifications = (filters: CertificationsFilter) => {

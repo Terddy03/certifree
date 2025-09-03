@@ -58,6 +58,8 @@ export const useAuth = () => {
 
   const profileChannelRef = useRef<any | null>(null);
 
+  const isFetchingSession = useRef(false); // Moved useRef outside useEffect
+
   const subscribeToProfileUpdates = (userId: string) => {
     try {
       if (profileChannelRef.current) {
@@ -109,11 +111,19 @@ export const useAuth = () => {
   };
 
   useEffect(() => {
+
     const getActiveSession = async () => {
-      startTimer('useAuth:getActiveSession'); // Start the timer
+      if (isFetchingSession.current) { // Prevent re-entry if already fetching
+        debug.log('getActiveSession: Already fetching, skipping.');
+        return;
+      }
+      isFetchingSession.current = true; // Set flag at the start
+      
       setAuthState(prev => ({ ...prev, loading: true }));
       debug.log('Starting session fetch');
       
+      debug.startTimer('getActiveSession'); // Always start timer at the beginning
+
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
 
@@ -154,7 +164,7 @@ export const useAuth = () => {
           const transformedProfile: UserProfile = {
             id: profile?.id || session.user.id,
             email: profile?.email || session.user.email || '',
-            fullName: profile?.full_name || profile?.fullName || 'User',
+            fullName: profile?.full_name || profile?.fullName || session.user.user_metadata?.full_name || 'User',
             avatarUrl: profile?.avatar_url || profile?.avatarUrl || '',
             bio: profile?.bio || '',
             subscriptionTier: profile?.subscription_tier || profile?.subscriptionTier || 'free',
@@ -190,7 +200,6 @@ export const useAuth = () => {
           // Subscribe to realtime profile updates for this user
           subscribeToProfileUpdates(session.user.id);
           
-          endTimer('useAuth:getActiveSession'); // End the timer
         } else {
           debug.log('No session found');
           setAuthState(prev => ({ ...prev, user: null, profile: null, loading: false }));
@@ -202,22 +211,34 @@ export const useAuth = () => {
       } catch (error: any) {
         debug.error("Error fetching session or profile", { error: error.message });
         setAuthState(prev => ({ ...prev, error: error.message, loading: false }));
+      } finally {
+        debug.endTimer('getActiveSession'); // Always end timer in finally
+        isFetchingSession.current = false; // Reset flag
       }
     };
 
     getActiveSession();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUserId = authState.user?.id; // Capture current user ID before state update
       setAuthState(prev => ({ ...prev, user: session?.user || null, loading: false }));
-      if (session?.user) {
-        // Re-fetch profile if auth state changes to logged in
-        getActiveSession(); // Re-enabled to prevent redundant calls causing timer issues
-        subscribeToProfileUpdates(session.user.id);
-      } else {
+
+      const newUserId = session?.user?.id;
+
+      // Only re-fetch profile if a new session is established or the user changes AND not already fetching
+      if (newUserId && newUserId !== currentUserId && !isFetchingSession.current) {
+        debug.log('Auth state change detected: New user session or user changed, re-fetching profile.', { newUserId });
+        getActiveSession();
+        subscribeToProfileUpdates(newUserId);
+      } else if (!newUserId && currentUserId) {
+        // User logged out
+        debug.log('Auth state change detected: User logged out.', { oldUserId: currentUserId });
         if (profileChannelRef.current) {
           supabase.removeChannel(profileChannelRef.current);
           profileChannelRef.current = null;
         }
+        // Ensure authState is fully reset if logging out
+        setAuthState({ user: null, profile: null, loading: false, error: null });
       }
     });
 
