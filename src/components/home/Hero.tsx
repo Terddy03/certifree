@@ -9,7 +9,7 @@ export const Hero = () => {
   const stats = [
     { label: "Skills", value: "200+" },
     { label: "Industries", value: "25+" },
-    { label: "Certs Listed", value: "10K+" },
+    { label: "Certs Listed", value: "100+" },
   ];
 
   return (

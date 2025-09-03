@@ -45,6 +45,17 @@ const Auth = () => {
   const [resendCooldown, setResendCooldown] = useState<number>(0);
   const [isResending, setIsResending] = useState<boolean>(false);
 
+  // Listen for auth state changes to redirect after social login
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        debug.log('Auth state changed, session found. Redirecting to dashboard.', { user: session.user.id });
+        navigate("/dashboard");
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [navigate, debug]);
+
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -89,13 +100,6 @@ const Auth = () => {
   const handleGoogleLogin = async () => {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: window.location.origin + '/dashboard',
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
-      },
     });
     if (error) {
       toast({ title: 'Google Sign-In Failed', description: error.message, variant: 'destructive' });

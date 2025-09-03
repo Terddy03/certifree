@@ -28,7 +28,14 @@ export interface UserProfile {
     skillsLearned: string[];
     currentGoal: string;
   };
-  userProgress: UserProgress[];
+  userProgress: { // Updated type for userProgress
+    id: string;
+    user_id: string;
+    course_id: string; // Changed from certification_id
+    status: string; 
+    enrolled_at: string | null; // Changed from started_at
+    progress_percentage: number; // Added
+  }[];
   userAchievements: UserAchievement[];
 }
 
@@ -103,7 +110,8 @@ export const useAuth = () => {
 
   useEffect(() => {
     const getActiveSession = async () => {
-      startTimer('useAuth:getActiveSession');
+      startTimer('useAuth:getActiveSession'); // Start the timer
+      setAuthState(prev => ({ ...prev, loading: true }));
       debug.log('Starting session fetch');
       
       try {
@@ -125,8 +133,8 @@ export const useAuth = () => {
           debug.log('Profile fetched', { profile });
           
           const { data: userProgress, error: userProgressError } = await supabase
-            .from('user_progress')
-            .select('*')
+            .from('course_enrollments') // Changed from 'user_progress'
+            .select('id, user_id, course_id, status, enrolled_at, progress_percentage') // Select specific columns matching UserProgressRow
             .eq('user_id', session.user.id);
           
           if (userProgressError) throw userProgressError;
@@ -167,7 +175,7 @@ export const useAuth = () => {
               skillsLearned: profile?.stats?.skillsLearned || profile?.stats?.skills_learned || [],
               currentGoal: profile?.stats?.currentGoal || profile?.stats?.current_goal || 'Complete your first certification',
             },
-            userProgress: userProgress as UserProgress[] || [],
+            userProgress: userProgress || [], // Simplified assignment
             userAchievements: userAchievements as UserAchievement[] || [],
           };
 
@@ -182,7 +190,7 @@ export const useAuth = () => {
           // Subscribe to realtime profile updates for this user
           subscribeToProfileUpdates(session.user.id);
           
-          endTimer('useAuth:getActiveSession');
+          endTimer('useAuth:getActiveSession'); // End the timer
         } else {
           debug.log('No session found');
           setAuthState(prev => ({ ...prev, user: null, profile: null, loading: false }));
@@ -203,7 +211,7 @@ export const useAuth = () => {
       setAuthState(prev => ({ ...prev, user: session?.user || null, loading: false }));
       if (session?.user) {
         // Re-fetch profile if auth state changes to logged in
-        getActiveSession();
+        getActiveSession(); // Re-enabled to prevent redundant calls causing timer issues
         subscribeToProfileUpdates(session.user.id);
       } else {
         if (profileChannelRef.current) {

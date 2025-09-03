@@ -1,0 +1,732 @@
+import React, { useState, useEffect } from 'react';
+import { ChevronRight, ChevronDown, Play, Lock, Check, Edit, Plus, Trash2, BookOpen, Award, Users, Settings } from 'lucide-react';
+
+const CourseManagementSystem = () => {
+  const [userRole, setUserRole] = useState('student'); // 'student' or 'admin'
+  const [currentView, setCurrentView] = useState('course'); // 'course', 'quiz', 'certificate', 'admin'
+  const [currentModule, setCurrentModule] = useState(0);
+  const [currentLesson, setCurrentLesson] = useState(0);
+  const [currentQuiz, setCurrentQuiz] = useState(null);
+  const [expandedModules, setExpandedModules] = useState({});
+  const [studentProgress, setStudentProgress] = useState({
+    completedLessons: new Set(),
+    moduleQuizScores: {},
+    finalQuizScore: null,
+    courseCompleted: false,
+    certificateId: null
+  });
+
+  // Mock course data
+  const [courseData, setCourseData] = useState({
+    title: "Building AI Solutions Using Advanced Algorithms and Open Source Frameworks",
+    description: "This course explores advanced topics, technology, and skills required to build robust Artificial Intelligence solutions to address key industry problems",
+    modules: [
+      {
+        id: 1,
+        title: "Deep Learning Networks",
+        lessons: [
+          { id: 1, title: "Machine Learning Explained", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat." },
+          { id: 2, title: "Deep Learning Explained", content: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum." },
+          { id: 3, title: "Deep Learning Networks Explained", content: "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo." }
+        ],
+        quiz: {
+          questions: [
+            {
+              question: "What is the primary purpose of deep learning?",
+              options: ["Data storage", "Pattern recognition", "File compression", "Web development"],
+              correct: 1
+            },
+            {
+              question: "Which of the following is a neural network architecture?",
+              options: ["Linear regression", "Decision tree", "Convolutional Neural Network", "Bubble sort"],
+              correct: 2
+            },
+            {
+              question: "What does GPU acceleration provide for deep learning?",
+              options: ["Better graphics", "Faster parallel processing", "More storage", "Better networking"],
+              correct: 1
+            }
+          ]
+        }
+      },
+      {
+        id: 2,
+        title: "Advanced AI Algorithms",
+        lessons: [
+          { id: 4, title: "Reinforcement Learning", content: "Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt." },
+          { id: 5, title: "Natural Language Processing", content: "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem." }
+        ],
+        quiz: {
+          questions: [
+            {
+              question: "What is reinforcement learning primarily used for?",
+              options: ["Image classification", "Decision making", "Data cleaning", "Database management"],
+              correct: 1
+            },
+            {
+              question: "Which technique is commonly used in NLP?",
+              options: ["Bubble sort", "Tokenization", "Disk formatting", "Network routing"],
+              correct: 1
+            }
+          ]
+        }
+      }
+    ],
+    finalQuiz: {
+      questions: [
+        {
+          question: "What is the main advantage of using open source AI frameworks?",
+          options: ["Cost effectiveness", "Proprietary algorithms", "Limited documentation", "Restricted access"],
+          correct: 0
+        },
+        {
+          question: "Which of the following best describes artificial intelligence?",
+          options: ["Simple automation", "Machine simulation of human intelligence", "Database management", "Network security"],
+          correct: 1
+        },
+        {
+          question: "What is the primary goal of machine learning?",
+          options: ["Data storage", "Pattern recognition and prediction", "User interface design", "Network configuration"],
+          correct: 1
+        },
+        {
+          question: "Which component is essential for deep learning models?",
+          options: ["Web browser", "Neural networks", "Spreadsheet software", "Email client"],
+          correct: 1
+        }
+      ]
+    }
+  });
+
+  // Admin editing states
+  const [editingModule, setEditingModule] = useState(null);
+  const [editingLesson, setEditingLesson] = useState(null);
+  const [editingQuiz, setEditingQuiz] = useState(null);
+
+  // Calculate progress
+  const calculateProgress = () => {
+    const totalLessons = courseData.modules.reduce((acc, module) => acc + module.lessons.length, 0);
+    const completedLessons = studentProgress.completedLessons.size;
+    return Math.round((completedLessons / totalLessons) * 100);
+  };
+
+  const isModuleUnlocked = (moduleIndex) => {
+    if (moduleIndex === 0) return true;
+    const previousModule = courseData.modules[moduleIndex - 1];
+    const previousScore = studentProgress.moduleQuizScores[previousModule.id];
+    return previousScore && previousScore >= 80;
+  };
+
+  const isLessonCompleted = (lessonId) => {
+    return studentProgress.completedLessons.has(lessonId);
+  };
+
+  const completeLesson = (lessonId) => {
+    setStudentProgress(prev => ({
+      ...prev,
+      completedLessons: new Set([...prev.completedLessons, lessonId])
+    }));
+  };
+
+  const submitQuiz = (answers, isModuleQuiz = true, moduleId = null) => {
+    const questions = isModuleQuiz 
+      ? courseData.modules.find(m => m.id === moduleId).quiz.questions
+      : courseData.finalQuiz.questions;
+    
+    let correct = 0;
+    answers.forEach((answer, index) => {
+      if (answer === questions[index].correct) correct++;
+    });
+    
+    const score = Math.round((correct / questions.length) * 100);
+    
+    if (isModuleQuiz) {
+      setStudentProgress(prev => ({
+        ...prev,
+        moduleQuizScores: { ...prev.moduleQuizScores, [moduleId]: score }
+      }));
+    } else {
+      const certificateId = `cert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setStudentProgress(prev => ({
+        ...prev,
+        finalQuizScore: score,
+        courseCompleted: score >= 75,
+        certificateId: score >= 75 ? certificateId : null
+      }));
+    }
+    
+    setCurrentQuiz(null);
+    if (!isModuleQuiz && score >= 75) {
+      setCurrentView('certificate');
+    }
+  };
+
+  // Admin functions
+  const addModule = () => {
+    const newModule = {
+      id: Date.now(),
+      title: "New Module",
+      lessons: [],
+      quiz: { questions: [] }
+    };
+    setCourseData(prev => ({
+      ...prev,
+      modules: [...prev.modules, newModule]
+    }));
+  };
+
+  const updateModule = (moduleId, updatedModule) => {
+    setCourseData(prev => ({
+      ...prev,
+      modules: prev.modules.map(m => m.id === moduleId ? updatedModule : m)
+    }));
+    setEditingModule(null);
+  };
+
+  const deleteModule = (moduleId) => {
+    setCourseData(prev => ({
+      ...prev,
+      modules: prev.modules.filter(m => m.id !== moduleId)
+    }));
+  };
+
+  const addLesson = (moduleId) => {
+    const newLesson = {
+      id: Date.now(),
+      title: "New Lesson",
+      content: "Lesson content goes here..."
+    };
+    setCourseData(prev => ({
+      ...prev,
+      modules: prev.modules.map(m => 
+        m.id === moduleId 
+          ? { ...m, lessons: [...m.lessons, newLesson] }
+          : m
+      )
+    }));
+  };
+
+  // Quiz Component
+  const QuizComponent = ({ quiz, isModuleQuiz = true, moduleId = null }) => {
+    const [answers, setAnswers] = useState({});
+    const [submitted, setSubmitted] = useState(false);
+
+    const handleSubmit = () => {
+      const answerArray = quiz.questions.map((_, index) => answers[index] || -1);
+      submitQuiz(answerArray, isModuleQuiz, moduleId);
+      setSubmitted(true);
+    };
+
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          <h2 className="text-2xl font-bold mb-6">
+            {isModuleQuiz ? 'Module Quiz' : 'Final Assessment'}
+          </h2>
+          <p className="text-gray-600 mb-8">
+            {isModuleQuiz 
+              ? 'You need to score at least 80% to unlock the next module.'
+              : 'You need to score at least 75% to complete the course.'}
+          </p>
+
+          {quiz.questions.map((question, index) => (
+            <div key={index} className="mb-6 p-6 bg-gray-50 rounded-lg">
+              <h3 className="font-semibold mb-4">
+                Question {index + 1}: {question.question}
+              </h3>
+              <div className="space-y-2">
+                {question.options.map((option, optionIndex) => (
+                  <label key={optionIndex} className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`question-${index}`}
+                      value={optionIndex}
+                      onChange={() => setAnswers(prev => ({ ...prev, [index]: optionIndex }))}
+                      className="text-blue-600"
+                    />
+                    <span>{option}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <button
+            onClick={handleSubmit}
+            disabled={Object.keys(answers).length < quiz.questions.length}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Submit Quiz
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Certificate Component
+  const CertificateComponent = () => {
+    const certificateUrl = `${window.location.origin}#certificate=${studentProgress.certificateId}`;
+    
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg shadow-xl p-12 text-center">
+          <Award className="w-24 h-24 text-gold-500 mx-auto mb-6" />
+          <h1 className="text-4xl font-bold text-gray-800 mb-4">Congratulations!</h1>
+          <p className="text-xl text-gray-600 mb-6">
+            You have successfully completed the course
+          </p>
+          <h2 className="text-2xl font-semibold text-gray-800 mb-8">
+            {courseData.title}
+          </h2>
+          
+          <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
+            <p className="text-gray-600 mb-2">Final Score:</p>
+            <p className="text-3xl font-bold text-green-600">{studentProgress.finalQuizScore}%</p>
+          </div>
+
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">Share your achievement:</p>
+            <div className="bg-white p-4 rounded-lg border">
+              <p className="text-sm text-gray-500 mb-2">Certificate Link:</p>
+              <p className="font-mono text-sm text-blue-600 break-all">{certificateUrl}</p>
+            </div>
+            <button 
+              onClick={() => navigator.clipboard.writeText(certificateUrl)}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+            >
+              Copy Certificate Link
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Admin Panel
+  const AdminPanel = () => {
+    return (
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="bg-white rounded-lg shadow-lg">
+          <div className="p-6 border-b">
+            <h2 className="text-2xl font-bold">Course Administration</h2>
+          </div>
+          
+          <div className="p-6">
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold mb-4">Course Details</h3>
+              <input
+                type="text"
+                value={courseData.title}
+                onChange={(e) => setCourseData(prev => ({ ...prev, title: e.target.value }))}
+                className="w-full p-3 border rounded-lg mb-4"
+                placeholder="Course Title"
+              />
+              <textarea
+                value={courseData.description}
+                onChange={(e) => setCourseData(prev => ({ ...prev, description: e.target.value }))}
+                className="w-full p-3 border rounded-lg h-24"
+                placeholder="Course Description"
+              />
+            </div>
+
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Modules</h3>
+                <button
+                  onClick={addModule}
+                  className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Module</span>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {courseData.modules.map((module, index) => (
+                  <div key={module.id} className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-semibold">{module.title}</h4>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => setEditingModule(module)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteModule(module.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium">Lessons ({module.lessons.length})</span>
+                        <button
+                          onClick={() => addLesson(module.id)}
+                          className="text-sm text-blue-600 hover:text-blue-800"
+                        >
+                          + Add Lesson
+                        </button>
+                      </div>
+                      <div className="pl-4 space-y-1">
+                        {module.lessons.map((lesson) => (
+                          <div key={lesson.id} className="text-sm text-gray-600 flex items-center justify-between">
+                            <span>{lesson.title}</span>
+                            <button
+                              onClick={() => setEditingLesson(lesson)}
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              <Edit className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="text-sm">
+                      <span className="font-medium">Quiz Questions: {module.quiz.questions.length}</span>
+                      <button
+                        onClick={() => setEditingQuiz({ moduleId: module.id, quiz: module.quiz })}
+                        className="ml-2 text-blue-600 hover:text-blue-800"
+                      >
+                        Edit Quiz
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Main Course View
+  const CourseView = () => {
+    const currentModuleData = courseData.modules[currentModule];
+    const currentLessonData = currentModuleData?.lessons[currentLesson];
+
+    return (
+      <div className="flex min-h-screen bg-gray-100">
+        {/* Sidebar */}
+        <div className="w-80 bg-gray-900 text-white overflow-y-auto">
+          <div className="p-6">
+            <h1 className="text-xl font-bold mb-2">{courseData.title}</h1>
+            <div className="text-sm text-gray-300 mb-4">
+              {calculateProgress()}% COMPLETE
+            </div>
+            <div className="w-full bg-gray-700 rounded-full h-2">
+              <div 
+                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${calculateProgress()}%` }}
+              ></div>
+            </div>
+          </div>
+
+          <div className="px-6 pb-6">
+            <div className="mb-4">
+              <div className="flex items-center text-sm text-gray-400 mb-2">
+                <span>COURSE OVERVIEW</span>
+              </div>
+            </div>
+
+            {courseData.modules.map((module, moduleIndex) => (
+              <div key={module.id} className="mb-4">
+                <div 
+                  className="flex items-center justify-between p-3 rounded cursor-pointer hover:bg-gray-800"
+                  onClick={() => setExpandedModules(prev => ({ 
+                    ...prev, 
+                    [module.id]: !prev[module.id] 
+                  }))}
+                >
+                  <div className="flex items-center space-x-3">
+                    {isModuleUnlocked(moduleIndex) ? (
+                      <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                        <span className="text-xs font-semibold">{moduleIndex + 1}</span>
+                      </div>
+                    ) : (
+                      <Lock className="w-5 h-5 text-gray-500" />
+                    )}
+                    <span className="font-medium">{module.title}</span>
+                  </div>
+                  {expandedModules[module.id] ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </div>
+
+                {expandedModules[module.id] && isModuleUnlocked(moduleIndex) && (
+                  <div className="ml-9 mt-2 space-y-2">
+                    {module.lessons.map((lesson, lessonIndex) => (
+                      <div 
+                        key={lesson.id}
+                        className={`flex items-center space-x-3 p-2 rounded cursor-pointer hover:bg-gray-800 ${
+                          currentModule === moduleIndex && currentLesson === lessonIndex ? 'bg-gray-800' : ''
+                        }`}
+                        onClick={() => {
+                          setCurrentModule(moduleIndex);
+                          setCurrentLesson(lessonIndex);
+                        }}
+                      >
+                        {isLessonCompleted(lesson.id) ? (
+                          <Check className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <Play className="w-4 h-4 text-gray-400" />
+                        )}
+                        <span className="text-sm">{lesson.title}</span>
+                      </div>
+                    ))}
+                    
+                    {/* Module Quiz */}
+                    <div 
+                      className="flex items-center space-x-3 p-2 rounded cursor-pointer hover:bg-gray-800"
+                      onClick={() => {
+                        if (module.lessons.every(lesson => isLessonCompleted(lesson.id))) {
+                          setCurrentQuiz({ type: 'module', moduleId: module.id, quiz: module.quiz });
+                          setCurrentView('quiz');
+                        }
+                      }}
+                    >
+                      <div className={`w-4 h-4 rounded-full ${
+                        studentProgress.moduleQuizScores[module.id] >= 80 ? 'bg-green-500' :
+                        studentProgress.moduleQuizScores[module.id] ? 'bg-red-500' :
+                        module.lessons.every(lesson => isLessonCompleted(lesson.id)) ? 'bg-yellow-500' :
+                        'bg-gray-500'
+                      }`}></div>
+                      <span className="text-sm">Module Quiz</span>
+                      {studentProgress.moduleQuizScores[module.id] && (
+                        <span className="text-xs text-gray-400">
+                          {studentProgress.moduleQuizScores[module.id]}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Final Quiz */}
+            {Object.keys(studentProgress.moduleQuizScores).length === courseData.modules.length &&
+             Object.values(studentProgress.moduleQuizScores).every(score => score >= 80) && (
+              <div 
+                className="flex items-center space-x-3 p-3 rounded cursor-pointer hover:bg-gray-800 bg-gray-800"
+                onClick={() => {
+                  setCurrentQuiz({ type: 'final', quiz: courseData.finalQuiz });
+                  setCurrentView('quiz');
+                }}
+              >
+                <Award className="w-5 h-5 text-yellow-500" />
+                <span className="font-medium">Final Assessment</span>
+                {studentProgress.finalQuizScore && (
+                  <span className="text-xs text-gray-400">
+                    {studentProgress.finalQuizScore}%
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-8">
+            {currentLessonData ? (
+              <div className="max-w-4xl">
+                <div className="mb-6">
+                  <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                    {currentLessonData.title}
+                  </h1>
+                  <p className="text-gray-600">
+                    Module {currentModule + 1}: {currentModuleData.title}
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
+                  <div className="prose max-w-none">
+                    <p className="text-lg leading-relaxed text-gray-700">
+                      {currentLessonData.content}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-between">
+                  <button
+                    onClick={() => {
+                      if (currentLesson > 0) {
+                        setCurrentLesson(currentLesson - 1);
+                      } else if (currentModule > 0) {
+                        const prevModule = currentModule - 1;
+                        setCurrentModule(prevModule);
+                        setCurrentLesson(courseData.modules[prevModule].lessons.length - 1);
+                      }
+                    }}
+                    disabled={currentModule === 0 && currentLesson === 0}
+                    className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      completeLesson(currentLessonData.id);
+                      
+                      if (currentLesson < currentModuleData.lessons.length - 1) {
+                        setCurrentLesson(currentLesson + 1);
+                      } else if (currentModule < courseData.modules.length - 1 && 
+                                isModuleUnlocked(currentModule + 1)) {
+                        setCurrentModule(currentModule + 1);
+                        setCurrentLesson(0);
+                      }
+                    }}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+                  >
+                    {isLessonCompleted(currentLessonData.id) ? 'Continue' : 'Mark Complete'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-16">
+                <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h2 className="text-2xl font-semibold text-gray-600 mb-2">Welcome to the Course</h2>
+                <p className="text-gray-500">Select a lesson from the sidebar to get started.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Navigation Header
+  const NavigationHeader = () => (
+    <div className="bg-white shadow-sm border-b">
+      <div className="max-w-6xl mx-auto px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-6">
+            <h1 className="text-xl font-bold">Learning Platform</h1>
+            {userRole === 'student' && (
+              <nav className="flex space-x-4">
+                <button
+                  onClick={() => setCurrentView('course')}
+                  className={`px-4 py-2 rounded-lg ${
+                    currentView === 'course' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  Course
+                </button>
+                {studentProgress.courseCompleted && (
+                  <button
+                    onClick={() => setCurrentView('certificate')}
+                    className={`px-4 py-2 rounded-lg ${
+                      currentView === 'certificate' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    Certificate
+                  </button>
+                )}
+              </nav>
+            )}
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <select
+              value={userRole}
+              onChange={(e) => {
+                setUserRole(e.target.value);
+                setCurrentView(e.target.value === 'admin' ? 'admin' : 'course');
+              }}
+              className="px-4 py-2 border rounded-lg"
+            >
+              <option value="student">Student View</option>
+              <option value="admin">Admin View</option>
+            </select>
+            
+            {userRole === 'admin' && (
+              <div className="flex items-center space-x-2 text-blue-600">
+                <Settings className="w-5 h-5" />
+                <span className="font-medium">Admin Mode</span>
+              </div>
+            )}
+            {userRole === 'student' && (
+              <div className="flex items-center space-x-2 text-gray-600">
+                <Users className="w-5 h-5" />
+                <span>Student</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Main render
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <NavigationHeader />
+      
+      {currentView === 'quiz' && currentQuiz && (
+        <QuizComponent 
+          quiz={currentQuiz.quiz}
+          isModuleQuiz={currentQuiz.type === 'module'}
+          moduleId={currentQuiz.moduleId}
+        />
+      )}
+      
+      {currentView === 'certificate' && studentProgress.courseCompleted && (
+        <CertificateComponent />
+      )}
+      
+      {currentView === 'admin' && userRole === 'admin' && (
+        <AdminPanel />
+      )}
+      
+      {currentView === 'course' && userRole === 'student' && (
+        <CourseView />
+      )}
+
+      {/* Editing Modals would go here - simplified for demo */}
+      {editingModule && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-96">
+            <h3 className="font-semibold mb-4">Edit Module</h3>
+            <input
+              type="text"
+              value={editingModule.title}
+              onChange={(e) => setEditingModule(prev => ({ ...prev, title: e.target.value }))}
+              className="w-full p-3 border rounded-lg mb-4"
+              placeholder="Module Title"
+            />
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  updateModule(editingModule.id, editingModule);
+                }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setEditingModule(null)}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CourseManagementSystem;

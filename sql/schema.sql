@@ -62,68 +62,279 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- 2. Certifications Table
--- Stores details about available IT certifications.
-CREATE TABLE IF NOT EXISTS public.certifications (
-    id text PRIMARY KEY, -- e.g., 'google-cloud-digital-leader'
+-- Renaming and re-purposing 'certifications' table to 'certifree_courses'
+ALTER TABLE public.certifications RENAME TO certifree_courses;
+
+-- 1. CertiFree Courses Table (formerly certifications)
+-- Stores details about available CertiFree courses.
+CREATE TABLE IF NOT EXISTS public.certifree_courses (
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
     title text NOT NULL,
-    provider text NOT NULL,
-    category text NOT NULL,
-    difficulty text NOT NULL,
-    duration text NOT NULL,
-    rating numeric NOT NULL,
-    total_reviews integer NOT NULL,
-    description text NOT NULL,
+    description text,
+    admin_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    -- Additional fields from original certifications table, adjusted:
+    provider text DEFAULT 'CertiFree' NOT NULL,
+    category text DEFAULT 'IT Certifications' NOT NULL,
+    difficulty text DEFAULT 'Beginner' NOT NULL,
+    duration text DEFAULT 'Flexible' NOT NULL,
+    rating numeric DEFAULT 0.0 NOT NULL,
+    total_reviews integer DEFAULT 0 NOT NULL,
     skills text[],
     prerequisites text[],
     image_url text,
-    external_url text NOT NULL,
-    is_free boolean NOT NULL,
-    certification_type text NOT NULL,
+    external_url text,
+    is_free boolean DEFAULT true NOT NULL,
+    certification_type text DEFAULT 'Course' NOT NULL,
     career_impact integer,
     completion_count integer DEFAULT 0 NOT NULL,
-    tags text[],
-    last_updated timestamp with time zone DEFAULT now() NOT NULL
+    tags text[]
 );
 
--- RLS for certifications table
-ALTER TABLE public.certifications ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Certifications are viewable by everyone." ON public.certifications;
-CREATE POLICY "Certifications are viewable by everyone." ON public.certifications
+-- RLS for certifree_courses table
+ALTER TABLE public.certifree_courses ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Certifree courses are viewable by everyone." ON public.certifree_courses;
+CREATE POLICY "Certifree courses are viewable by everyone." ON public.certifree_courses
   FOR SELECT USING (true);
 
--- 3. User Progress Table
--- Tracks individual user's progress on certifications.
-CREATE TABLE IF NOT EXISTS public.user_progress (
+DROP POLICY IF EXISTS "Admins can manage certifree courses." ON public.certifree_courses;
+CREATE POLICY "Admins can manage certifree courses." ON public.certifree_courses
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  ) WITH CHECK (
+    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  );
+
+-- 2. CertiFree Modules Table
+-- Stores modules within a CertiFree course.
+CREATE TABLE IF NOT EXISTS public.certifree_modules (
     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-    certification_id text REFERENCES public.certifications(id) ON DELETE CASCADE NOT NULL,
-    status text DEFAULT 'planned' NOT NULL, -- e.g., 'planned', 'in_progress', 'completed', 'paused'
-    progress_percentage integer DEFAULT 0 NOT NULL,
-    time_spent_minutes integer DEFAULT 0 NOT NULL,
-    started_at timestamp with time zone,
-    completed_at timestamp with time zone,
-    last_activity_at timestamp with time zone DEFAULT now() NOT NULL,
-    notes text,
-    UNIQUE (user_id, certification_id) -- Ensures a user has only one progress entry per certification
+    course_id uuid REFERENCES public.certifree_courses(id) ON DELETE CASCADE NOT NULL,
+    title text NOT NULL,
+    description text,
+    "order" integer NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    UNIQUE (course_id, "order")
 );
 
--- RLS for user_progress table
-ALTER TABLE public.user_progress ENABLE ROW LEVEL SECURITY;
+-- RLS for certifree_modules table
+ALTER TABLE public.certifree_modules ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Certifree modules are viewable by enrolled users and admins." ON public.certifree_modules;
+CREATE POLICY "Certifree modules are viewable by enrolled users and admins." ON public.certifree_modules
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.certifree_enrollments ce WHERE ce.user_id = auth.uid() AND ce.course_id = certifree_modules.course_id)
+    OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  );
 
-DROP POLICY IF EXISTS "Users can view their own progress." ON public.user_progress;
-CREATE POLICY "Users can view their own progress." ON public.user_progress
+DROP POLICY IF EXISTS "Admins can manage certifree modules." ON public.certifree_modules;
+CREATE POLICY "Admins can manage certifree modules." ON public.certifree_modules
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  ) WITH CHECK (
+    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  );
+
+-- 3. CertiFree Lessons Table
+-- Stores lesson content within a CertiFree module.
+CREATE TABLE IF NOT EXISTS public.certifree_lessons (
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    module_id uuid REFERENCES public.certifree_modules(id) ON DELETE CASCADE NOT NULL,
+    title text NOT NULL,
+    content text,
+    "order" integer NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    UNIQUE (module_id, "order")
+);
+
+-- RLS for certifree_lessons table
+ALTER TABLE public.certifree_lessons ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Certifree lessons are viewable by enrolled users and admins." ON public.certifree_lessons;
+CREATE POLICY "Certifree lessons are viewable by enrolled users and admins." ON public.certifree_lessons
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.certifree_modules cm JOIN public.certifree_enrollments ce ON cm.course_id = ce.course_id WHERE cm.id = certifree_lessons.module_id AND ce.user_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  );
+
+DROP POLICY IF EXISTS "Admins can manage certifree lessons." ON public.certifree_lessons;
+CREATE POLICY "Admins can manage certifree lessons." ON public.certifree_lessons
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  ) WITH CHECK (
+    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  );
+
+-- 4. CertiFree Quizzes Table
+-- Stores quizzes associated with modules or a final course quiz.
+CREATE TABLE IF NOT EXISTS public.certifree_quizzes (
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title text NOT NULL,
+    description text,
+    module_id uuid REFERENCES public.certifree_modules(id) ON DELETE CASCADE,
+    course_id uuid REFERENCES public.certifree_courses(id) ON DELETE CASCADE,
+    "order" integer,
+    pass_percentage integer NOT NULL,
+    type text NOT NULL, -- 'module_quiz' or 'final_quiz'
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT one_quiz_per_module_or_course UNIQUE (module_id, course_id, type),
+    CONSTRAINT check_quiz_type_associations CHECK (
+        (type = 'module_quiz' AND module_id IS NOT NULL AND course_id IS NULL) OR
+        (type = 'final_quiz' AND course_id IS NOT NULL AND module_id IS NULL)
+    )
+);
+
+-- RLS for certifree_quizzes table
+ALTER TABLE public.certifree_quizzes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Certifree quizzes are viewable by enrolled users and admins." ON public.certifree_quizzes;
+CREATE POLICY "Certifree quizzes are viewable by enrolled users and admins." ON public.certifree_quizzes
+  FOR SELECT USING (
+    (module_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.certifree_modules cm JOIN public.certifree_enrollments ce ON cm.course_id = ce.course_id WHERE cm.id = certifree_quizzes.module_id AND ce.user_id = auth.uid()))
+    OR (course_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.certifree_enrollments ce WHERE ce.course_id = certifree_quizzes.course_id AND ce.user_id = auth.uid()))
+    OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  );
+
+DROP POLICY IF EXISTS "Admins can manage certifree quizzes." ON public.certifree_quizzes;
+CREATE POLICY "Admins can manage certifree quizzes." ON public.certifree_quizzes
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  ) WITH CHECK (
+    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  );
+
+-- 5. CertiFree Quiz Questions Table
+-- Stores individual quiz questions.
+CREATE TABLE IF NOT EXISTS public.certifree_quiz_questions (
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    quiz_id uuid REFERENCES public.certifree_quizzes(id) ON DELETE CASCADE NOT NULL,
+    question_text text NOT NULL,
+    question_type text NOT NULL, -- 'multiple_choice', 'true_false', 'short_answer'
+    options text[],
+    correct_answer text NOT NULL,
+    explanation text,
+    "order" integer NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    UNIQUE (quiz_id, "order")
+);
+
+-- RLS for certifree_quiz_questions table
+ALTER TABLE public.certifree_quiz_questions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Certifree quiz questions are viewable by enrolled users and admins." ON public.certifree_quiz_questions;
+CREATE POLICY "Certifree quiz questions are viewable by enrolled users and admins." ON public.certifree_quiz_questions
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.certifree_quizzes cq JOIN public.certifree_enrollments ce ON cq.course_id = ce.course_id WHERE cq.id = certifree_quiz_questions.quiz_id AND ce.user_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.certifree_quizzes cq JOIN public.certifree_modules cm ON cq.module_id = cm.id JOIN public.certifree_enrollments ce ON cm.course_id = ce.course_id WHERE cq.id = certifree_quiz_questions.quiz_id AND ce.user_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  );
+
+DROP POLICY IF EXISTS "Admins can manage certifree quiz questions." ON public.certifree_quiz_questions;
+CREATE POLICY "Admins can manage certifree quiz questions." ON public.certifree_quiz_questions
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  ) WITH CHECK (
+    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  );
+
+-- 6. CertiFree Quiz Attempts Table
+-- Records a user's attempt at a quiz.
+CREATE TABLE IF NOT EXISTS public.certifree_quiz_attempts (
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    quiz_id uuid REFERENCES public.certifree_quizzes(id) ON DELETE CASCADE NOT NULL,
+    score_percentage integer NOT NULL,
+    passed boolean NOT NULL,
+    attempt_number integer NOT NULL,
+    answers jsonb, -- Stores a mapping of question_id to user_answer
+    submitted_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+-- RLS for certifree_quiz_attempts table
+ALTER TABLE public.certifree_quiz_attempts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view their own quiz attempts." ON public.certifree_quiz_attempts;
+CREATE POLICY "Users can view their own quiz attempts." ON public.certifree_quiz_attempts
   FOR SELECT USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Users can insert their own progress." ON public.user_progress;
-CREATE POLICY "Users can insert their own progress." ON public.user_progress
+DROP POLICY IF EXISTS "Users can insert their own quiz attempts." ON public.certifree_quiz_attempts;
+CREATE POLICY "Users can insert their own quiz attempts." ON public.certifree_quiz_attempts
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Users can update their own progress." ON public.user_progress;
-CREATE POLICY "Users can update their own progress." ON public.user_progress
+-- Admins can view all quiz attempts (for auditing/reporting)
+DROP POLICY IF EXISTS "Admins can view all quiz attempts." ON public.certifree_quiz_attempts;
+CREATE POLICY "Admins can view all quiz attempts." ON public.certifree_quiz_attempts
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true)));
+
+-- 7. CertiFree Enrollments Table (formerly user_progress)
+-- Tracks individual user's progress on CertiFree courses.
+CREATE TABLE IF NOT EXISTS public.certifree_enrollments (
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    course_id uuid REFERENCES public.certifree_courses(id) ON DELETE CASCADE NOT NULL,
+    enrolled_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    progress integer DEFAULT 0 NOT NULL, -- e.g., 0-100 percentage of course completion
+    progress_array integer[] DEFAULT '{}'::integer[] NOT NULL, -- Stores an array of completed lesson orders
+    completed_modules_count integer DEFAULT 0 NOT NULL,
+    passed_quizzes uuid[] DEFAULT '{}'::uuid[] NOT NULL, -- Stores an array of quiz IDs that the user has passed
+    UNIQUE (user_id, course_id) -- Ensures a user has only one enrollment entry per course
+);
+
+-- RLS for certifree_enrollments table
+ALTER TABLE public.certifree_enrollments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view their own enrollments." ON public.certifree_enrollments;
+CREATE POLICY "Users can view their own enrollments." ON public.certifree_enrollments
+  FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can insert their own enrollments." ON public.certifree_enrollments;
+CREATE POLICY "Users can insert their own enrollments." ON public.certifree_enrollments
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update their own enrollments." ON public.certifree_enrollments;
+CREATE POLICY "Users can update their own enrollments." ON public.certifree_enrollments
   FOR UPDATE USING (auth.uid() = user_id);
 
--- 4. User Achievements Table
+-- Admins can view all enrollments (for auditing/reporting)
+DROP POLICY IF EXISTS "Admins can view all enrollments." ON public.certifree_enrollments;
+CREATE POLICY "Admins can view all enrollments." ON public.certifree_enrollments
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true)));
+
+-- 8. CertiFree Certificates Table
+-- Stores records of generated certificates for completed courses.
+CREATE TABLE IF NOT EXISTS public.certifree_certificates (
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    course_id uuid REFERENCES public.certifree_courses(id) ON DELETE CASCADE NOT NULL,
+    storage_path text NOT NULL, -- Path to the generated certificate file in Supabase Storage
+    generated_at timestamp with time zone DEFAULT now() NOT NULL,
+    public_url text UNIQUE, -- Publicly accessible URL for the certificate
+    UNIQUE (user_id, course_id) -- Ensures a user gets only one certificate per course
+);
+
+-- RLS for certifree_certificates table
+ALTER TABLE public.certifree_certificates ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Certificates are viewable by owner or publicly if URL exists." ON public.certifree_certificates;
+CREATE POLICY "Certificates are viewable by owner or publicly if URL exists." ON public.certifree_certificates
+  FOR SELECT USING (
+    auth.uid() = user_id OR public_url IS NOT NULL
+  );
+
+DROP POLICY IF EXISTS "Users can insert their own certificates." ON public.certifree_certificates;
+CREATE POLICY "Users can insert their own certificates." ON public.certifree_certificates
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Admins can manage certificates (for re-generation, revocation, etc.)
+DROP POLICY IF EXISTS "Admins can manage certificates." ON public.certifree_certificates;
+CREATE POLICY "Admins can manage certificates." ON public.certifree_certificates
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  ) WITH CHECK (
+    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND (p.is_admin = true OR p.is_super_admin = true))
+  );
+
+-- 9. User Achievements Table
 -- Records achievements unlocked by users.
 CREATE TABLE IF NOT EXISTS public.user_achievements (
     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -146,7 +357,7 @@ DROP POLICY IF EXISTS "Users can insert their own achievements." ON public.user_
 CREATE POLICY "Users can insert their own achievements." ON public.user_achievements
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- 5. Quiz Questions Table
+-- 10. Quiz Questions Table
 -- Stores individual quiz questions for certifications.
 CREATE TABLE IF NOT EXISTS public.quiz_questions (
     id text PRIMARY KEY, -- e.g., 'q-001'
@@ -167,7 +378,7 @@ DROP POLICY IF EXISTS "Quiz questions are viewable by everyone." ON public.quiz_
 CREATE POLICY "Quiz questions are viewable by everyone." ON public.quiz_questions
   FOR SELECT USING (true);
 
--- 6. Quiz Attempts Table
+-- 11. Quiz Attempts Table
 -- Records a user's attempt at a quiz.
 CREATE TABLE IF NOT EXISTS public.quiz_attempts (
     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -193,7 +404,7 @@ DROP POLICY IF EXISTS "Users can insert their own quiz attempts." ON public.quiz
 CREATE POLICY "Users can insert their own quiz attempts." ON public.quiz_attempts
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- 7. Certification Reviews Table
+-- 12. Certification Reviews Table
 -- Stores user reviews for certifications.
 CREATE TABLE IF NOT EXISTS public.certification_reviews (
     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -228,8 +439,14 @@ CREATE POLICY "Users can update their own reviews." ON public.certification_revi
 
 -- Set up Realtime for all tables
 ALTER PUBLICATION supabase_realtime ADD TABLE profiles;
-ALTER PUBLICATION supabase_realtime ADD TABLE certifications;
-ALTER PUBLICATION supabase_realtime ADD TABLE user_progress;
+ALTER PUBLICATION supabase_realtime ADD TABLE certifree_courses;
+ALTER PUBLICATION supabase_realtime ADD TABLE certifree_modules;
+ALTER PUBLICATION supabase_realtime ADD TABLE certifree_lessons;
+ALTER PUBLICATION supabase_realtime ADD TABLE certifree_quizzes;
+ALTER PUBLICATION supabase_realtime ADD TABLE certifree_quiz_questions;
+ALTER PUBLICATION supabase_realtime ADD TABLE certifree_quiz_attempts;
+ALTER PUBLICATION supabase_realtime ADD TABLE certifree_enrollments;
+ALTER PUBLICATION supabase_realtime ADD TABLE certifree_certificates;
 ALTER PUBLICATION supabase_realtime ADD TABLE user_achievements;
 ALTER PUBLICATION supabase_realtime ADD TABLE quiz_questions;
 ALTER PUBLICATION supabase_realtime ADD TABLE quiz_attempts;

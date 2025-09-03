@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Certification } from '@/lib/mock-data/certifications';
+import { Certification } from '@/lib/types/certifree'; // Corrected import path
 import { componentDebug, startTimer, endTimer } from '@/lib/debugger';
 
 interface CertificationsFilter {
@@ -20,18 +20,21 @@ const transformCertification = (dbCertification: any): Certification => ({
   difficulty: dbCertification.difficulty,
   duration: dbCertification.duration,
   rating: dbCertification.rating || 0,
-  totalReviews: dbCertification.total_reviews || 0,
+  total_reviews: dbCertification.total_reviews || 0, // Corrected to snake_case
   description: dbCertification.description,
   skills: dbCertification.skills || [],
   prerequisites: dbCertification.prerequisites || [],
-  imageUrl: dbCertification.image_url || '/api/placeholder/400/240',
-  externalUrl: dbCertification.external_url || '#',
-  isFree: dbCertification.is_free || true,
-  certificationType: dbCertification.certification_type || 'Course',
-  careerImpact: dbCertification.career_impact || 5,
-  completionCount: dbCertification.completion_count || 0,
+  image_url: dbCertification.image_url || '/api/placeholder/400/240', // Corrected to snake_case
+  external_url: dbCertification.external_url || '#', // Corrected to snake_case
+  is_free: dbCertification.is_free || true, // Corrected to snake_case
+  certification_type: dbCertification.certification_type || 'Course', // Corrected to snake_case
+  career_impact: dbCertification.career_impact || 5, // Corrected to snake_case
+  completion_count: dbCertification.completion_count || 0, // Corrected to snake_case
   tags: dbCertification.tags || [],
-  lastUpdated: dbCertification.last_updated || new Date().toISOString().split('T')[0]
+  admin_id: dbCertification.admin_id || null, // Added admin_id
+  created_at: dbCertification.created_at, // Use created_at directly
+  updated_at: dbCertification.updated_at || new Date().toISOString(), // Use updated_at directly
+  modules: dbCertification.modules,
 });
 
 export const useCertifications = (filters: CertificationsFilter) => {
@@ -72,58 +75,59 @@ export const useCertifications = (filters: CertificationsFilter) => {
           return;
         }
 
-        let query = supabase.from('certifications').select('*');
-
-        // Apply filters
+        // Fetch public certifications
+        let certsQuery = supabase.from('certifications').select('*');
+        // Apply filters for public certs
         if (filters.searchQuery) {
-          query = query.or(
-            `title.ilike.%${filters.searchQuery}%`,
-            `provider.ilike.%${filters.searchQuery}%`,
-            `skills.cs.{${filters.searchQuery}}` // Assuming skills are stored as an array of text
+          certsQuery = certsQuery.or(
+            `title.ilike.%${filters.searchQuery}%,provider.ilike.%${filters.searchQuery}%,skills.cs.{${filters.searchQuery}}`
           );
         }
         if (filters.selectedCategory !== "all") {
-          query = query.eq('category', filters.selectedCategory);
+          certsQuery = certsQuery.eq('category', filters.selectedCategory);
         }
         if (filters.selectedDifficulty !== "all") {
-          query = query.eq('difficulty', filters.selectedDifficulty);
+          certsQuery = certsQuery.eq('difficulty', filters.selectedDifficulty);
         }
         if (filters.selectedProvider !== "all") {
-          query = query.eq('provider', filters.selectedProvider);
+          certsQuery = certsQuery.eq('provider', filters.selectedProvider);
         }
 
-        // Apply sorting
-        switch (filters.sortBy) {
-          case "popular":
-            query = query.order('completion_count', { ascending: false });
-            break;
-          case "rating":
-            query = query.order('rating', { ascending: false });
-            break;
-          case "newest":
-            query = query.order('last_updated', { ascending: false });
-            break;
-          case "duration":
-            query = query.order('duration', { ascending: true }); // Assuming duration is sortable numerically
-            break;
-          default:
-            query = query.order('completion_count', { ascending: false });
+        const { data: certificationsData, error: certificationsError } = await certsQuery;
+
+        if (certificationsError) {
+          debug.error("Error fetching certifications", { error: certificationsError.message });
+          if (isMounted.current) {
+            setError(certificationsError.message);
+          }
         }
 
-        const { data, error } = await query;
+        let combinedCertifications: Certification[] = [];
 
-        if (error) {
-          debug.error("Error fetching certifications", { error: error.message });
-          if (isMounted.current) {
-            setError(error.message);
+        if (certificationsData) {
+          combinedCertifications = [...combinedCertifications, ...certificationsData.map(transformCertification)];
+        }
+
+        // Custom sort
+        combinedCertifications.sort((a, b) => {
+          switch (filters.sortBy) {
+            case "popular":
+              return (b.completion_count || 0) - (a.completion_count || 0); // Use completion_count
+            case "rating":
+              return (b.rating || 0) - (a.rating || 0);
+            case "newest":
+              return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(); // Use updated_at
+            case "duration":
+              // This assumes duration can be parsed numerically for comparison
+              // For now, a simple string comparison or more complex parsing would be needed
+              return a.duration.localeCompare(b.duration);
+            default:
+              return (b.completion_count || 0) - (a.completion_count || 0); // Use completion_count
           }
-        } else {
-          debug.log("Certifications fetched successfully", { count: data?.length });
-          // Transform the data from snake_case to camelCase
-          const transformedData = data ? data.map(transformCertification) : [];
-          if (isMounted.current) {
-            setCertifications(transformedData);
-          }
+        });
+
+        if (isMounted.current) {
+          setCertifications(combinedCertifications);
         }
       } catch (err: any) {
         debug.error("Unhandled error during certifications fetch", { error: err.message, stack: err.stack });

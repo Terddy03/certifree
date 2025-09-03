@@ -19,6 +19,8 @@ import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
 import HowItWorks from "@/pages/HowItWorks";
 import { useAuth } from "@/hooks/useAuth";
+import Courses from "./pages/Courses"; // Import new Courses component
+import CourseDetailLogic from "./pages/CourseDetail"; // Import new CourseDetail component
 
 const queryClient = new QueryClient();
 
@@ -64,6 +66,8 @@ const App = () => (
           <Route path="/settings" element={<ProtectedRoute><RequireAdmin><Settings /></RequireAdmin></ProtectedRoute>} /> {/* Secured */}
           <Route path="/admin/logs" element={<ProtectedRoute><RequireSuperAdmin><AdminLogs /></RequireSuperAdmin></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/courses" element={<ProtectedRoute><Courses /></ProtectedRoute>} />
+          <Route path="/courses/:id" element={<ProtectedRoute><CourseDetailLogic /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         <DebugToggle />

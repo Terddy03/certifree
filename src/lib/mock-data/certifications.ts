@@ -19,7 +19,7 @@ export interface Certification {
   imageUrl: string;
   externalUrl: string;
   isFree: boolean;
-  certificationType: "Course" | "Exam" | "Project" | "Bootcamp";
+  certificationType: "Course" | "Exam" | "Project" | "Bootcamp"; // Removed "CertiFree" | "Public"
   careerImpact: number; // 1-10 scale
   completionCount: number;
   tags: string[];
@@ -42,3 +42,25 @@ export const DEFAULT_CATEGORIES: { name: DefaultCategory; slug: string }[] = [
   { name: "Entrepreneurship", slug: "entrepreneurship" },
   { name: "Education and Liberal Arts", slug: "education-liberal-arts" },
 ];
+
+export interface Course {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string; // profile id
+  status: 'draft' | 'published';
+}
+
+export interface Lesson {
+  id: string;
+  courseId: string;
+  title: string;
+  content?: string;
+  videoUrl?: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}

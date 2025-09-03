@@ -241,7 +241,9 @@ const Settings = () => {
                       onClick={async () => {
                         const { error } = await createCertification({
                           ...certForm,
+                          id: undefined, // Let Supabase generate the UUID
                           isFree: true,
+                          completion_count: 0,
                         });
                         if (error) toast({ title: "Create certification failed", description: error.message, variant: "destructive" });
                         else {

@@ -31,7 +31,7 @@ import { supabase } from "@/lib/supabase";
 import { componentDebug } from "@/lib/debugger";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
-import { deleteCertification, listCategories, updateCertification as updateCertificationAdmin, createCertification as createCertificationAdmin } from "@/lib/admin";
+import { deleteCertification, listCategories, updateCertification as updateCertificationAdmin, createCertification as createCertificationAdmin, CertificationInput } from "@/lib/admin";
 import { addFavorite, removeFavorite, isFavorited } from "@/lib/favorites";
 import { isTaking, startTaking, stopTaking, countTakersFor } from "@/lib/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -106,6 +106,154 @@ const Certifications = () => {
   const [takingIds, setTakingIds] = useState<Record<string, boolean>>({});
   const [takersCount, setTakersCount] = useState<Record<string, number>>({});
   const [adding, setAdding] = useState(false);
+
+  const [editForm, setEditForm] = useState<Partial<CertificationInput>>({
+    title: "",
+    provider: "",
+    category: "",
+    difficulty: "Beginner",
+    duration: "",
+    description: "",
+    externalUrl: "",
+    certificationType: "Course",
+    imageUrl: "",
+    type: "public", // Added for edit form
+    courseId: "", // Added for edit form
+  });
+
+  const openEdit = (c: Certification) => {
+    setEditing(c);
+    setEditForm({
+      title: c.title,
+      provider: c.provider,
+      category: c.category,
+      difficulty: c.difficulty,
+      duration: c.duration,
+      description: c.description,
+      externalUrl: c.externalUrl,
+      certificationType: c.certificationType,
+      imageUrl: c.imageUrl || "",
+      type: c.type, // Populate type
+      courseId: c.course_id || "", // Populate courseId
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+
+    // Validate Course ID format if CertiFree type and ID is provided (not null)
+    if (editForm.type === 'certifree' && editForm.courseId) {
+      const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+      if (!uuidRegex.test(editForm.courseId)) {
+        toast({ title: "Invalid Course ID", description: "Course ID must be a valid UUID format (e.g., xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx) or left empty.", variant: "destructive" });
+        return; // Prevent form submission
+      }
+    }
+
+    const { error } = await updateCertificationAdmin(editing.id, {
+      ...editForm,
+      type: editForm.type as "public" | "certifree", // Ensure correct type
+      certificationType: editForm.type === 'certifree' ? 'CertiFree' : (editForm.certificationType as "Course" | "Exam" | "Project" | "Bootcamp" | "Public"), // Set based on type
+      courseId: editForm.type === 'certifree' ? (editForm.courseId || null) : undefined, // Only send courseId if certifree, convert empty string to null
+    });
+    if (error) {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+    } else {
+      setCerts(prev => prev.map(c => c.id === editing.id ? { ...c, ...editForm } as Certification : c));
+      toast({ title: "Certification updated" });
+      setEditing(null);
+    }
+  };
+
+  // Add Certification form
+  const [addForm, setAddForm] = useState<Partial<CertificationInput>>({
+    id: "",
+    title: "",
+    provider: "",
+    category: "",
+    difficulty: "Beginner",
+    duration: "",
+    description: "",
+    externalUrl: "",
+    certificationType: "Course",
+    imageUrl: "",
+    type: "public", // Default to public
+    courseId: "", // Initialize courseId
+  });
+
+  const saveAdd = async () => {
+    if (!addForm.title || !addForm.provider || !addForm.category) { // Removed addForm.id from validation
+      toast({ title: "Missing fields", description: "Title, Provider, Category are required.", variant: "destructive" });
+      return;
+    }
+
+    // Generate ID (slug) from title
+    const generatedId = addForm.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
+    if (!generatedId) {
+        toast({ title: "Invalid Title", description: "Could not generate a valid ID from the title. Please provide a more descriptive title.", variant: "destructive" });
+        return;
+    }
+
+    const newCertification: CertificationInput = {
+      id: generatedId, // Use generated ID
+      title: addForm.title,
+      provider: addForm.provider,
+      category: addForm.category,
+      difficulty: addForm.difficulty || "Beginner",
+      duration: addForm.duration || "",
+      description: addForm.description || "",
+      externalUrl: addForm.externalUrl || "#",
+      imageUrl: addForm.imageUrl || "",
+      isFree: true,
+      certificationType: addForm.type === 'certifree' ? 'CertiFree' : (addForm.certificationType || 'Course'),
+      tags: addForm.tags || [],
+      type: addForm.type || 'public',
+      courseId: addForm.type === 'certifree' ? (addForm.courseId || null) : undefined, // Only send courseId if certifree, convert empty string to null
+    };
+
+    // Validate Course ID format if CertiFree type and ID is provided (not null)
+    if (newCertification.type === 'certifree' && newCertification.courseId) {
+      const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+      if (!uuidRegex.test(newCertification.courseId)) {
+        toast({ title: "Invalid Course ID", description: "Course ID must be a valid UUID format (e.g., xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx) or left empty.", variant: "destructive" });
+        return; // Prevent form submission
+      }
+    }
+    
+    const { error } = await createCertificationAdmin(newCertification);
+    if (error) {
+      toast({ title: "Create failed", description: error.message, variant: "destructive" });
+    } else {
+      const newCert: Certification = {
+        id: generatedId, // Use generated ID for UI update
+        title: addForm.title,
+        provider: addForm.provider,
+        category: addForm.category,
+        difficulty: addForm.difficulty as any,
+        duration: addForm.duration,
+        rating: 0,
+        totalReviews: 0,
+        description: addForm.description,
+        skills: [],
+        prerequisites: [],
+        imageUrl: addForm.imageUrl,
+        externalUrl: addForm.externalUrl,
+        isFree: true,
+        certificationType: addForm.certificationType as any,
+        careerImpact: 0,
+        completionCount: 0,
+        tags: [],
+        lastUpdated: new Date().toISOString(),
+        // Default new certifications to CertiFree if created via admin UI for now
+        type: addForm.type, // Use the type from the form
+        course_id: addForm.courseId, // Ensure course_id is passed
+      };
+      setCerts(prev => [newCert, ...prev]);
+      setAdding(false);
+      setAddForm({ id: "", title: "", provider: "", category: "", difficulty: "Beginner", duration: "", description: "", externalUrl: "", certificationType: "Course", imageUrl: "", type: "public", courseId: "" });
+      toast({ title: "Certification created" });
+    }
+  };
 
   useEffect(() => {
     setCerts(filteredCertifications);
@@ -229,7 +377,7 @@ const Certifications = () => {
   };
 
   const handleToggleFavorite = async (cert: Certification) => {
-    if (!profile?.id) return toast({ title: "Please sign in to favorite." });
+    if (!profile?.id) return void toast({ title: "Please sign in to favorite." });
     const isFav = !!favoriteIds[cert.id];
     setFavoriteIds(prev => ({ ...prev, [cert.id]: !isFav }));
     const { error } = isFav ? await removeFavorite(profile.id, cert.id) : await addFavorite(profile.id, cert.id);
@@ -241,7 +389,7 @@ const Certifications = () => {
   };
 
   const handleToggleTaking = async (cert: Certification) => {
-    if (!profile?.id) return toast({ title: "Please sign in to track progress." });
+    if (!profile?.id) return void toast({ title: "Please sign in to track progress." });
     const taking = !!takingIds[cert.id];
     setTakingIds(prev => ({ ...prev, [cert.id]: !taking }));
     // optimistic update of count
@@ -251,96 +399,6 @@ const Certifications = () => {
       setTakingIds(prev => ({ ...prev, [cert.id]: taking }));
       setTakersCount(prev => ({ ...prev, [cert.id]: Math.max(0, (prev[cert.id] || 0) + (taking ? 1 : -1)) }));
       toast({ title: "Could not update status", description: error.message, variant: "destructive" });
-    }
-  };
-
-  const [editForm, setEditForm] = useState({
-    title: "",
-    provider: "",
-    category: "",
-    difficulty: "Beginner",
-    duration: "",
-    description: "",
-    externalUrl: "",
-    certificationType: "Course",
-    imageUrl: "",
-  });
-
-  const openEdit = (c: Certification) => {
-    setEditing(c);
-    setEditForm({
-      title: c.title,
-      provider: c.provider,
-      category: c.category,
-      difficulty: c.difficulty,
-      duration: c.duration,
-      description: c.description,
-      externalUrl: c.externalUrl,
-      certificationType: c.certificationType,
-      imageUrl: c.imageUrl || "",
-    });
-  };
-
-  const saveEdit = async () => {
-    if (!editing) return;
-    const { error } = await updateCertificationAdmin(editing.id, editForm as any);
-    if (error) {
-      toast({ title: "Update failed", description: error.message, variant: "destructive" });
-    } else {
-      setCerts(prev => prev.map(c => c.id === editing.id ? { ...c, ...editForm } as Certification : c));
-      toast({ title: "Certification updated" });
-      setEditing(null);
-    }
-  };
-
-  // Add Certification form
-  const [addForm, setAddForm] = useState({
-    id: "",
-    title: "",
-    provider: "",
-    category: "",
-    difficulty: "Beginner",
-    duration: "",
-    description: "",
-    externalUrl: "",
-    certificationType: "Course",
-    imageUrl: "",
-  });
-
-  const saveAdd = async () => {
-    if (!addForm.id || !addForm.title || !addForm.provider || !addForm.category) {
-      toast({ title: "Missing fields", description: "ID, Title, Provider, Category are required.", variant: "destructive" });
-      return;
-    }
-    const { error } = await createCertificationAdmin({ ...addForm, isFree: true });
-    if (error) {
-      toast({ title: "Create failed", description: error.message, variant: "destructive" });
-    } else {
-      const newCert: Certification = {
-        id: addForm.id,
-        title: addForm.title,
-        provider: addForm.provider,
-        category: addForm.category,
-        difficulty: addForm.difficulty as any,
-        duration: addForm.duration,
-        rating: 0,
-        totalReviews: 0,
-        description: addForm.description,
-        skills: [],
-        prerequisites: [],
-        imageUrl: addForm.imageUrl,
-        externalUrl: addForm.externalUrl,
-        isFree: true,
-        certificationType: addForm.certificationType as any,
-        careerImpact: 0,
-        completionCount: 0,
-        tags: [],
-        lastUpdated: new Date().toISOString(),
-      };
-      setCerts(prev => [newCert, ...prev]);
-      setAdding(false);
-      setAddForm({ id: "", title: "", provider: "", category: "", difficulty: "Beginner", duration: "", description: "", externalUrl: "", certificationType: "Course", imageUrl: "" });
-      toast({ title: "Certification created" });
     }
   };
 
@@ -363,32 +421,42 @@ const Certifications = () => {
   const MAX_UPLOAD_MB = 1;
   const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/svg+xml", "application/pdf"];
 
-  const CategoryPills = () => (
-    <div className="flex flex-wrap gap-2">
-      <Button
-        variant={selectedCategory === "all" ? "default" : "outline"}
-        className={selectedCategory === "all" ? "bg-[#ffc300] text-[#001d3d]" : "text-gray-300 border-[#003566]"}
-        onClick={() => setSelectedCategory("all")}
-      >
-        All
-      </Button>
-      {categories.map(cat => (
-        <Button
-          key={cat.name}
-          variant={selectedCategory === cat.name ? "default" : "outline"}
-          className={selectedCategory === cat.name ? "bg-[#ffc300] text-[#001d3d]" : "text-gray-300 border-[#003566]"}
-          onClick={() => setSelectedCategory(cat.name)}
-        >
-          {cat.name}
-        </Button>
-      ))}
-      {isAdmin && (
-        <Button variant="ghost" className="text-gray-300 hover:text-[#ffd60a]" onClick={() => navigate('/settings')}>Manage</Button>
-      )}
-    </div>
-  );
+  // const CategoryPills = () => (
+  //   <div className="flex flex-wrap gap-2">
+  //     <Button
+  //       variant={selectedCategory === "all" ? "default" : "outline"}
+  //       className={selectedCategory === "all" ? "bg-[#ffc300] text-[#001d3d]" : "text-gray-300 border-[#003566]"}
+  //       onClick={() => setSelectedCategory("all")}
+  //     >
+  //       All
+  //     </Button>
+  //     {categories.map(cat => (
+  //       <Button
+  //         key={cat.name}
+  //         variant={selectedCategory === cat.name ? "default" : "outline"}
+  //         className={selectedCategory === cat.name ? "bg-[#ffc300] text-[#001d3d]" : "text-gray-300 border-[#003566]"}
+  //         onClick={() => setSelectedCategory(cat.name)}
+  //       >
+  //         {cat.name}
+  //       </Button>
+  //     ))}
+  //     {isAdmin && (
+  //       <Button variant="ghost" className="text-gray-300 hover:text-[#ffd60a]" onClick={() => navigate('/settings')}>Manage</Button>
+  //     )}
+  //   </div>
+  // );
 
-  const CertificationCard = ({ certification }: { certification: Certification }) => (
+  const CertificationCard = ({ certification, isAdmin, openEdit, handleDelete, deletingId, favoriteIds, handleToggleFavorite, takersCount, requireAuth }: {
+    certification: Certification;
+    isAdmin: boolean;
+    openEdit: (cert: Certification) => void;
+    handleDelete: (id: string, title: string) => Promise<void>;
+    deletingId: string | null;
+    favoriteIds: Record<string, boolean>;
+    handleToggleFavorite: (cert: Certification) => Promise<void>;
+    takersCount: Record<string, number>;
+    requireAuth: (action: () => void) => void;
+  }) => (
     <Card className="bg-[#001d3d] text-white rounded-xl shadow-xl border border-[#003566] hover:scale-[1.01] transition-transform duration-200 ease-out group">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
@@ -435,7 +503,14 @@ const Certifications = () => {
             </div>
             <div className="min-w-0 flex-1">
               <CardTitle className="text-base leading-tight text-white group-hover:text-[#ffd60a] transition-colors">
-                <button onClick={() => requireAuth(() => navigate(`/certifications/${certification.id}`))} className="text-left w-full hover:underline">
+                <button onClick={() => requireAuth(() => {
+                  // Correct navigation for CertiFree vs Public certifications
+                  if (certification.type === 'certifree' && certification.course_id) {
+                    navigate(`/courses/${certification.course_id}`);
+                  } else {
+                    navigate(`/certifications/${certification.id}`);
+                  }
+                })} className="text-left w-full hover:underline">
                   {certification.title}
                 </button>
               </CardTitle>
@@ -474,7 +549,14 @@ const Certifications = () => {
         </div>
 
         <div className="flex gap-3 pt-4">
-          <Button className="flex-1 bg-[#ffc300] text-[#001d3d] font-semibold hover:bg-[#ffd60a] transition-colors duration-200" onClick={() => requireAuth(() => navigate(`/certifications/${certification.id}`))}>
+          <Button className="flex-1 bg-[#ffc300] text-[#001d3d] font-semibold hover:bg-[#ffd60a] transition-colors duration-200" onClick={() => requireAuth(() => {
+            // Correct navigation for CertiFree vs Public certifications
+            if (certification.type === 'certifree' && certification.course_id) {
+              navigate(`/courses/${certification.course_id}`);
+            } else {
+              navigate(`/certifications/${certification.id}`);
+            }
+          })}>
             View Details
           </Button>
           <Button variant="outline" size="icon" asChild className="bg-[#003566] text-[#ffd60a] border-[#001d3d] hover:bg-[#001d3d]">
@@ -487,7 +569,17 @@ const Certifications = () => {
     </Card>
   );
 
-  const CertificationListItem = ({ certification }: { certification: Certification }) => (
+  const CertificationListItem = ({ certification, isAdmin, openEdit, handleDelete, deletingId, favoriteIds, handleToggleFavorite, takersCount, requireAuth }: {
+    certification: Certification;
+    isAdmin: boolean;
+    openEdit: (cert: Certification) => void;
+    handleDelete: (id: string, title: string) => Promise<void>;
+    deletingId: string | null;
+    favoriteIds: Record<string, boolean>;
+    handleToggleFavorite: (cert: Certification) => Promise<void>;
+    takersCount: Record<string, number>;
+    requireAuth: (action: () => void) => void;
+  }) => (
     <Card className="bg-[#001d3d] text-white rounded-xl shadow-xl border border-[#003566] hover:scale-[1.01] transition-transform duration-300 ease-out">
       <CardContent className="p-6">
         <div className="flex gap-6 items-center">
@@ -502,10 +594,15 @@ const Certifications = () => {
           <div className="flex-1 space-y-3">
             <div className="flex items-start justify-between">
               <div className="space-y-2">
-                
-
                 <h3 className="text-lg font-semibold text-white hover:text-[#ffd60a] transition-colors duration-200">
-                  <button onClick={() => requireAuth(() => navigate(`/certifications/${certification.id}`))} className="text-left w-full hover:underline">
+                  <button onClick={() => requireAuth(() => {
+                    // Correct navigation for CertiFree vs Public certifications
+                    if (certification.type === 'certifree' && certification.course_id) {
+                      navigate(`/courses/${certification.course_id}`);
+                    } else {
+                      navigate(`/certifications/${certification.id}`);
+                    }
+                  })} className="text-left w-full hover:underline">
                     {certification.title}
                   </button>
                 </h3>
@@ -546,8 +643,6 @@ const Certifications = () => {
               </div>
             </div>
 
-            
-
             <div className="flex items-center justify-between mt-3">
               <div className="flex items-center gap-6 text-xs text-gray-400">
                 
@@ -562,7 +657,14 @@ const Certifications = () => {
               </div>
 
               <div className="flex gap-3">
-                <Button className="bg-[#ffc300] text-[#001d3d] font-semibold hover:bg-[#ffd60a] transition-colors duration-200" onClick={() => requireAuth(() => navigate(`/certifications/${certification.id}`))}>
+                <Button className="flex-1 bg-[#ffc300] text-[#001d3d] font-semibold hover:bg-[#ffd60a] transition-colors duration-200" onClick={() => requireAuth(() => {
+                  // Correct navigation for CertiFree vs Public certifications
+                  if (certification.type === 'certifree' && certification.course_id) {
+                    navigate(`/courses/${certification.course_id}`);
+                  } else {
+                    navigate(`/certifications/${certification.id}`);
+                  }
+                })}>
                   View Details
                 </Button>
                 <Button variant="outline" size="icon" asChild className="bg-[#003566] text-[#ffd60a] border-[#001d3d] hover:bg-[#001d3d]">
@@ -577,6 +679,10 @@ const Certifications = () => {
       </CardContent>
     </Card>
   );
+
+  // Separate CertiFree and Public Certifications
+  const certiFreeCerts = certs.filter(cert => cert.type === 'certifree');
+  const publicCerts = certs.filter(cert => cert.type === 'public');
 
   return (
     <div className="min-h-screen bg-[#000814] text-gray-100">
@@ -616,10 +722,113 @@ const Certifications = () => {
               </Button>
             )}
           </div>
-          <CategoryPills />
+          {/* <CategoryPills /> */}
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger className="w-[200px] bg-[#001d3d] border-[#003566] text-white">
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent className="bg-[#001d3d] border-[#003566] text-white">
+              <SelectItem value="all" className="hover:bg-[#003566] hover:text-[#ffd60a]">All</SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat.name} value={cat.name} className="hover:bg-[#003566] hover:text-[#ffd60a]">
+                  {cat.name}
+                </SelectItem>
+              ))}
+              {isAdmin && (
+                <Button variant="ghost" className="text-gray-300 hover:text-[#ffd60a] w-full text-left justify-start" onClick={() => navigate('/settings')}>Manage Categories</Button>
+              )}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Results Header */}
+        {/* CertiFree Certifications Section */}
+        {certiFreeCerts.length > 0 && (
+          <div className="mb-10">
+            <h2 className="text-2xl font-bold text-white mb-6">CertiFree Certifications</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {certiFreeCerts.map((certification) => (
+                viewMode === "grid" ? (
+                  <CertificationCard
+                    key={certification.id}
+                    certification={certification}
+                    isAdmin={isAdmin}
+                    openEdit={openEdit}
+                    handleDelete={handleDelete}
+                    deletingId={deletingId}
+                    favoriteIds={favoriteIds}
+                    handleToggleFavorite={handleToggleFavorite}
+                    takersCount={takersCount}
+                    requireAuth={requireAuth}
+                  />
+                ) : (
+                  <CertificationListItem
+                    key={certification.id}
+                    certification={certification}
+                    isAdmin={isAdmin}
+                    openEdit={openEdit}
+                    handleDelete={handleDelete}
+                    deletingId={deletingId}
+                    favoriteIds={favoriteIds}
+                    handleToggleFavorite={handleToggleFavorite}
+                    takersCount={takersCount}
+                    requireAuth={requireAuth}
+                  />
+                )
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Public Certifications Section */}
+        {publicCerts.length > 0 && (
+          <div className="mb-10">
+            <h2 className="text-2xl font-bold text-white mb-6">Public Certifications</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {publicCerts.map((certification) => (
+                viewMode === "grid" ? (
+                  <CertificationCard
+                    key={certification.id}
+                    certification={certification}
+                    isAdmin={isAdmin}
+                    openEdit={openEdit}
+                    handleDelete={handleDelete}
+                    deletingId={deletingId}
+                    favoriteIds={favoriteIds}
+                    handleToggleFavorite={handleToggleFavorite}
+                    takersCount={takersCount}
+                    requireAuth={requireAuth}
+                  />
+                ) : (
+                  <CertificationListItem
+                    key={certification.id}
+                    certification={certification}
+                    isAdmin={isAdmin}
+                    openEdit={openEdit}
+                    handleDelete={handleDelete}
+                    deletingId={deletingId}
+                    favoriteIds={favoriteIds}
+                    handleToggleFavorite={handleToggleFavorite}
+                    takersCount={takersCount}
+                    requireAuth={requireAuth}
+                  />
+                )
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* No Results */}
+        {certs.length === 0 && (
+          <div className="text-center py-20 bg-[#001d3d] rounded-xl border border-[#003566] shadow-xl text-gray-300">
+            <BookOpen className="h-16 w-16 text-[#003566] mx-auto mb-6" />
+            <h3 className="text-2xl font-semibold mb-3">No certifications found</h3>
+            <p className="text-base text-gray-400 max-w-md mx-auto">
+              Try adjusting your search terms or filters to find what you're looking for.
+            </p>
+          </div>
+        )}
+
+        {/* Results Header (moved to reflect combined count) */}
         <div className="flex items-center justify-between mb-6 text-gray-300">
           <p className="text-lg">Showing {certs.length} certifications {debouncedSearch && ` for "${debouncedSearch}"`}</p>
           <div className="flex rounded-lg border border-[#003566] bg-[#001d3d]">
@@ -646,31 +855,7 @@ const Certifications = () => {
           </div>
         </div>
 
-        {/* Certifications Grid/List */}
-        {viewMode === "grid" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {certs.map((certification) => (
-              <CertificationCard key={certification.id} certification={certification} />
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {certs.map((certification) => (
-              <CertificationListItem key={certification.id} certification={certification} />
-            ))}
-          </div>
-        )}
-
-        {/* No Results */}
-        {certs.length === 0 && (
-          <div className="text-center py-20 bg-[#001d3d] rounded-xl border border-[#003566] shadow-xl text-gray-300">
-            <BookOpen className="h-16 w-16 text-[#003566] mx-auto mb-6" />
-            <h3 className="text-2xl font-semibold mb-3">No certifications found</h3>
-            <p className="text-base text-gray-400 max-w-md mx-auto">
-              Try adjusting your search terms or filters to find what you're looking for.
-            </p>
-          </div>
-        )}
+        
       </main>
 
       <Footer />
@@ -702,6 +887,22 @@ const Certifications = () => {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label className="text-gray-300">Type</Label>
+              <Select value={editForm.type} onValueChange={(v: "public" | "certifree") => setEditForm({ ...editForm, type: v })}>
+                <SelectTrigger className="bg-[#000814] border-[#003566] text-white"><SelectValue placeholder="Select type" /></SelectTrigger>
+                <SelectContent className="bg-[#001d3d] border-[#003566] text-white">
+                  <SelectItem value="public">Public</SelectItem>
+                  <SelectItem value="certifree">CertiFree</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {editForm.type === 'certifree' && (
+              <div>
+                <Label className="text-gray-300">Course ID (for CertiFree)</Label>
+                <Input value={editForm.courseId} onChange={(e) => setEditForm({ ...editForm, courseId: e.target.value })} className="bg-[#000814] border-[#003566] text-white" placeholder="Optional: Link to an existing course" />
+              </div>
+            )}
             {/* Difficulty removed from UI per request */}
             <div>
               <Label className="text-gray-300">Duration</Label>
@@ -750,10 +951,7 @@ const Certifications = () => {
             <DialogDescription>Provide the details below to create a new certification.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-gray-300">ID (slug)</Label>
-              <Input value={addForm.id} onChange={(e) => setAddForm({ ...addForm, id: e.target.value })} className="bg-[#000814] border-[#003566] text-white" placeholder="e.g., google-data-analytics" />
-            </div>
+            {/* Removed ID (slug) field - now auto-generated from Title */}
             <div>
               <Label className="text-gray-300">Title</Label>
               <Input value={addForm.title} onChange={(e) => setAddForm({ ...addForm, title: e.target.value })} className="bg-[#000814] border-[#003566] text-white" />
@@ -773,6 +971,22 @@ const Certifications = () => {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label className="text-gray-300">Type</Label>
+              <Select value={addForm.type} onValueChange={(v: "public" | "certifree") => setAddForm({ ...addForm, type: v, certificationType: v === 'certifree' ? 'CertiFree' : 'Public' })}>
+                <SelectTrigger className="bg-[#000814] border-[#003566] text-white"><SelectValue placeholder="Select type" /></SelectTrigger>
+                <SelectContent className="bg-[#001d3d] border-[#003566] text-white">
+                  <SelectItem value="public">Public</SelectItem>
+                  <SelectItem value="certifree">CertiFree</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {addForm.type === 'certifree' && (
+              <div>
+                <Label className="text-gray-300">Course ID (for CertiFree)</Label>
+                <Input value={addForm.courseId} onChange={(e) => setAddForm({ ...addForm, courseId: e.target.value })} className="bg-[#000814] border-[#003566] text-white" placeholder="Optional: Link to an existing course" />
+              </div>
+            )}
             {/* Difficulty removed from UI per request */}
             <div>
               <Label className="text-gray-300">Duration</Label>
